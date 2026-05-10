@@ -1,0 +1,56 @@
+# ===========================================================================
+# Arora — Dart Analysis Options
+#
+# Extends the official flutter_lints ruleset with additional strict rules
+# to maintain code quality across all contributions.
+# ===========================================================================
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # Treat these as errors, not warnings
+  errors:
+    missing_required_param: error
+    missing_return: error
+    dead_code: warning
+    unused_import: warning
+    unused_local_variable: warning
+
+  exclude:
+    # Exclude generated files from analysis
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "lib/data/datasources/local/isar_database.g.dart"
+    - "patches/**"
+    - "test/widget_test.dart"
+    - "test/unit/services/smart_shuffle_engine_test.dart"
+
+linter:
+  rules:
+    # ── Imports ─────────────────────────────────────────────────────────────
+    # Always use package: imports (never relative paths across lib/ boundaries)
+    always_use_package_imports: true
+
+    # ── Debugging ───────────────────────────────────────────────────────────
+    # Prevent print() statements in production code; use logger.dart instead
+    avoid_print: true
+
+    # ── Type safety ─────────────────────────────────────────────────────────
+    avoid_dynamic_calls: true
+    prefer_typing_uninitialized_variables: true
+
+    # ── Code style ──────────────────────────────────────────────────────────
+    prefer_final_fields: true
+    prefer_final_locals: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_single_quotes: true
+    require_trailing_commas: true
+
+    # ── Async safety ────────────────────────────────────────────────────────
+    unawaited_futures: true
+    avoid_void_async: true
+
+    # ── Documentation ───────────────────────────────────────────────────────
+    # Public APIs must have doc comments (enforces contributor documentation)
+    public_member_api_docs: false   # Set to true once codebase stabilises
