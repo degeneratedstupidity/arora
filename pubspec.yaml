@@ -95,7 +95,6 @@ flutter:
 
   assets:
     - .env                             # Loaded by flutter_dotenv at startup
-    - assets/images/
     - assets/icons/
 
 

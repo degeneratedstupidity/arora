@@ -6,7 +6,6 @@
 # ---------------------------------------------------------------------------
 # SECRETS — NEVER COMMIT THESE
 # ---------------------------------------------------------------------------
-.env
 *.env.local
 android/app/google-services.json
 ios/GoogleService-Info.plist
