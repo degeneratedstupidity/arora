@@ -1,54 +1,93 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:arora/core/utils/logger.dart';
-import 'package:arora/services/audio/audio_player_service.dart';
 
-/// {@template audio_service_handler}
-/// Bridges [AudioPlayerService] with the `audio_service` plugin.
+/// Global singleton registered with [AudioService.init] at startup.
 ///
-/// ## What this enables
-/// By implementing [BaseAudioHandler], Arora gets:
-/// - **Lock screen controls** on iOS and Android (play/pause/skip/seek)
-/// - **Media notification** with album art and progress bar
-/// - **Hardware media button** support (headphones, car Bluetooth)
-/// - **MPRIS integration** on Linux (media controls in desktop DEs)
-/// - **macOS Now Playing** widget
-/// - **Background playback** that survives the app being backgrounded
+/// [AudioPlayerService] is wired in after Riverpod initialises by calling
+/// [aroraAudioHandler.connect]. This breaks the circular import that would
+/// occur if [AudioPlayerService] imported this file directly.
+final aroraAudioHandler = AudioServiceHandler();
+
+/// Bridges Arora's audio engine with the `audio_service` plugin.
 ///
-/// ## Integration
-/// Registered via [AudioService.init] in `lib/main.dart` during app startup.
-/// `audio_service` manages the native media session lifecycle.
+/// Registers media controls on the Android notification, lock screen,
+/// Bluetooth headsets, and MPRIS (Linux). All playback commands are
+/// forwarded to [AudioPlayerService] via the [_onPlay], [_onPause], etc.
+/// callbacks set by [connect].
 ///
-/// ## Why this is a separate class
-/// `audio_service` requires its own `BaseAudioHandler` subclass to run
-/// in an isolate-safe context. Keeping it separate from [AudioPlayerService]
-/// maintains the single-responsibility principle.
-/// {@endtemplate}
+/// ## Why callbacks instead of a direct reference
+/// [AudioPlayerService] lives inside Riverpod and is created after
+/// [AudioService.init]. Storing callbacks (plain Dart closures) instead of
+/// a typed reference avoids a circular import between the two files.
 class AudioServiceHandler extends BaseAudioHandler with SeekHandler {
-  AudioServiceHandler(this._audioService);
-
-  final AudioPlayerService _audioService;
   static const _log = AroraLogger('AudioServiceHandler');
+
+  // Callbacks wired up by player_providers.dart after Riverpod initialises.
+  Future<void> Function()? _onPlay;
+  Future<void> Function()? _onPause;
+  Future<void> Function()? _onSkipNext;
+  Future<void> Function()? _onSkipPrevious;
+  Future<void> Function(Duration)? _onSeek;
+  Future<void> Function()? _onFastForward;
+  Future<void> Function()? _onRewind;
+  bool Function()? _getIsPlaying;
+  bool Function()? _getIsLoading;
+  Duration Function()? _getPosition;
+  Duration? Function()? _getDuration;
+  MediaItem? Function()? _getMediaItem;
+
+  /// Wire up the audio engine after Riverpod creates [AudioPlayerService].
+  ///
+  /// Called once from [audioPlayerServiceProvider] in player_providers.dart.
+  void connect({
+    required Future<void> Function() onPlay,
+    required Future<void> Function() onPause,
+    required Future<void> Function() onSkipNext,
+    required Future<void> Function() onSkipPrevious,
+    required Future<void> Function(Duration) onSeek,
+    required Future<void> Function() onFastForward,
+    required Future<void> Function() onRewind,
+    required bool Function() getIsPlaying,
+    required bool Function() getIsLoading,
+    required Duration Function() getPosition,
+    required Duration? Function() getDuration,
+    required MediaItem? Function() getMediaItem,
+  }) {
+    _onPlay = onPlay;
+    _onPause = onPause;
+    _onSkipNext = onSkipNext;
+    _onSkipPrevious = onSkipPrevious;
+    _onSeek = onSeek;
+    _onFastForward = onFastForward;
+    _onRewind = onRewind;
+    _getIsPlaying = getIsPlaying;
+    _getIsLoading = getIsLoading;
+    _getPosition = getPosition;
+    _getDuration = getDuration;
+    _getMediaItem = getMediaItem;
+    _log.debug('connect: audio engine wired to media session');
+  }
 
   // ── BaseAudioHandler overrides ────────────────────────────────────────────
 
   @override
   Future<void> play() async {
-    _log.debug('play (from media button / lock screen)');
-    await _audioService.resume();
-    await _broadcastState();
+    _log.debug('play (lock screen / headset)');
+    await _onPlay?.call();
+    await broadcastState();
   }
 
   @override
   Future<void> pause() async {
-    _log.debug('pause (from media button / lock screen)');
-    await _audioService.pause();
-    await _broadcastState();
+    _log.debug('pause (lock screen / headset)');
+    await _onPause?.call();
+    await broadcastState();
   }
 
   @override
   Future<void> stop() async {
     _log.debug('stop');
-    await _audioService.pause();
+    await _onPause?.call();
     playbackState.add(playbackState.value.copyWith(
       processingState: AudioProcessingState.idle,
     ),);
@@ -56,68 +95,72 @@ class AudioServiceHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToNext() async {
-    _log.debug('skipToNext (from lock screen)');
-    await _audioService.skipNext();
+    _log.debug('skipToNext (lock screen)');
+    await _onSkipNext?.call();
     _updateMediaItem();
-    await _broadcastState();
+    await broadcastState();
   }
 
   @override
   Future<void> skipToPrevious() async {
-    _log.debug('skipToPrevious (from lock screen)');
-    await _audioService.skipPrevious();
+    _log.debug('skipToPrevious (lock screen)');
+    await _onSkipPrevious?.call();
     _updateMediaItem();
-    await _broadcastState();
+    await broadcastState();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    _log.debug('seek: ${position.inSeconds}s (from lock screen)');
-    await _audioService.seek(position);
-    await _broadcastState();
+    _log.debug('seek: ${position.inSeconds}s');
+    await _onSeek?.call(position);
+    await broadcastState();
   }
 
   @override
   Future<void> fastForward() async {
-    await _audioService.seekForward();
-    await _broadcastState();
+    await _onFastForward?.call();
+    await broadcastState();
   }
 
   @override
   Future<void> rewind() async {
-    await _audioService.seekBackward();
-    await _broadcastState();
+    await _onRewind?.call();
+    await broadcastState();
   }
 
   // ── State broadcasting ────────────────────────────────────────────────────
 
-  /// Pushes the current [AudioPlayerService] state to `audio_service`.
+  /// Pushes current playback state to the system media session.
   ///
-  /// Must be called after every state-changing action so the lock screen
-  /// and notification remain in sync with actual playback.
-  Future<void> _broadcastState() async {
-    final isPlaying = _audioService.isPlaying;
-    final position = _audioService.position;
-    final duration = _audioService.duration;
+  /// Called by [AudioPlayerService] (via the [onMediaChanged] callback)
+  /// whenever song or play/pause state changes so the notification and
+  /// lock screen stay in sync.
+  Future<void> broadcastState() async {
+    final isPlaying = _getIsPlaying?.call() ?? false;
+    final isLoading = _getIsLoading?.call() ?? false;
+    final position = _getPosition?.call() ?? Duration.zero;
+    final duration = _getDuration?.call();
+
+    final processingState = isLoading
+        ? AudioProcessingState.loading
+        : isPlaying
+            ? AudioProcessingState.ready
+            : AudioProcessingState.idle;
 
     playbackState.add(
       PlaybackState(
         controls: [
-          MediaControl.rewind,
           MediaControl.skipToPrevious,
           isPlaying ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
-          MediaControl.fastForward,
         ],
         systemActions: const {
           MediaAction.seek,
           MediaAction.seekForward,
           MediaAction.seekBackward,
         },
-        androidCompactActionIndices: const [1, 2, 3],
-        processingState: isPlaying
-            ? AudioProcessingState.ready
-            : AudioProcessingState.idle,
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: processingState,
         playing: isPlaying,
         updatePosition: position,
         bufferedPosition: duration ?? Duration.zero,
@@ -126,19 +169,20 @@ class AudioServiceHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
-  /// Updates the [MediaItem] (track metadata) on the lock screen / notification.
+  /// Pushes updated [MediaItem] (title, artist, artwork) to the session.
   void _updateMediaItem() {
-    final item = _audioService.currentMediaItem;
+    final item = _getMediaItem?.call();
     if (item != null) {
       mediaItem.add(item);
     }
   }
 
-  /// Call this whenever the current song changes.
+  /// Called whenever the current song changes.
   ///
-  /// Broadcasts the updated [MediaItem] to the system media session.
+  /// Updates both the [MediaItem] (artwork / title) and the [PlaybackState]
+  /// so the notification and lock screen reflect the new track immediately.
   void onSongChanged() {
     _updateMediaItem();
-    _broadcastState();
+    broadcastState();
   }
 }

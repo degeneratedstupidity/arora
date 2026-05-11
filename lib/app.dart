@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:arora/core/theme/app_motion.dart';
+import 'package:arora/core/theme/app_spacing.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/core/theme/theme_provider.dart';
 import 'package:arora/features/downloads/screens/downloads_screen.dart';
 import 'package:arora/features/home/screens/home_screen.dart';
@@ -12,6 +15,7 @@ import 'package:arora/features/player/screens/now_playing_screen.dart';
 import 'package:arora/features/player/widgets/mini_player_bar.dart';
 import 'package:arora/features/search/screens/search_screen.dart';
 import 'package:arora/infrastructure/youtube/youtube_explode_music_provider.dart';
+import 'package:arora/shared/widgets/spring_button.dart';
 import 'package:arora/shared/widgets/window_title_bar.dart';
 
 import 'package:arora/core/theme/settings_screen.dart';
@@ -82,11 +86,29 @@ final _router = GoRouter(
         ),
       ],
     ),
-    // Full-screen player — no bottom nav or mini player
+    // Full-screen player — slides up from the bottom like a modal sheet.
     GoRoute(
       path: '/player',
       name: 'player',
-      builder: (_, __) => const NowPlayingScreen(),
+      pageBuilder: (_, state) => CustomTransitionPage<void>(
+        key: state.pageKey,
+        child: const NowPlayingScreen(),
+        transitionDuration: AppMotion.slow,
+        reverseTransitionDuration: AppMotion.medium,
+        transitionsBuilder: (ctx, animation, _, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: AppMotion.decelerate,
+              reverseCurve: Curves.easeIn,
+            ),
+          ),
+          child: child,
+        ),
+      ),
     ),
     GoRoute(
       path: '/settings',
@@ -295,20 +317,16 @@ class _DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final t = Theme.of(context).extension<AroraTheme>()!;
+    final c = t.colors(context);
 
     return Row(
       children: [
         // ── Sidebar / Rail ───────────────────────────────────────────────
+        // No border — depth comes from background color contrast alone:
+        // scaffold uses c.background, sidebar uses c.surface.
         Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            border: Border(
-              right: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.2),
-              ),
-            ),
-          ),
+          color: c.surface,
           child: Column(
             children: [
               Expanded(
@@ -317,15 +335,7 @@ class _DesktopLayout extends StatelessWidget {
                   selectedIndex: currentIndex,
                   onDestinationSelected: onTap,
                   backgroundColor: Colors.transparent,
-                  indicatorColor: colorScheme.primary.withValues(alpha: 0.15),
-                  selectedIconTheme: IconThemeData(color: colorScheme.primary),
-                  selectedLabelTextStyle: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelTextStyle: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                  // Styling flows from navigationRailTheme set in AroraTheme.toMaterialTheme
                   destinations: _tabs
                       .map(
                         (t) => NavigationRailDestination(
@@ -337,20 +347,28 @@ class _DesktopLayout extends StatelessWidget {
                       .toList(),
                 ),
               ),
-              // Mini player at the bottom of the sidebar
+
+              // Mini player at the bottom of the sidebar (extended rail only)
               if (extended)
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(8, 0, 8, 12),
+                  padding: EdgeInsets.fromLTRB(
+                      AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm,),
                   child: MiniPlayerBar(),
                 )
               else
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: IconButton(
-                    icon: const Icon(Icons.queue_music_rounded),
-                    tooltip: 'Now Playing',
-                    color: colorScheme.primary,
-                    onPressed: () => context.push('/player'),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: SpringButton(
+                    onTap: () => context.push('/player'),
+                    child: SizedBox(
+                      width: AppSpacing.touchTarget,
+                      height: AppSpacing.touchTarget,
+                      child: Icon(
+                        Icons.queue_music_rounded,
+                        color: c.textSecondary,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -381,15 +399,25 @@ class _MobileLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context).extension<AroraTheme>()!;
+    final c = t.colors(context);
+
     return Scaffold(
+      backgroundColor: c.background,
       body: child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Mini player floats above the nav bar with its own padding + shadow.
+          // No divider — the pill's shadow creates sufficient separation.
           const MiniPlayerBar(),
+
+          // Navigation bar — colors flow from navigationBarTheme in ThemeData.
           NavigationBar(
             selectedIndex: currentIndex,
             onDestinationSelected: onTap,
+            // Shrink height slightly for a tighter feel
+            height: 64,
             destinations: _tabs
                 .map(
                   (t) => NavigationDestination(

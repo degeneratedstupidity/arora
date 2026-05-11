@@ -46,7 +46,7 @@
 |---|---|
 | 🎵 **Ad-free streaming** | Audio streamed directly from YouTube — no Premium required |
 | 🎬 **Music video mode** | Switch to HD video for any track on the Now Playing screen |
-| 🔀 **Smart Shuffle** | Queue auto-refills with related tracks via YouTube Radio Mix |
+| 🔀 **Smart Shuffle** | Queue auto-refills with related tracks; uses recently played songs as alternate seeds for variety |
 | 💡 **Personalized recommendations** | "Because you listened to X" section powered by your play history |
 | 🎙️ **Synced lyrics** | Lyrics from YouTube closed captions, scrolling in real time |
 | 📥 **Offline playback** | Download any track to play without an internet connection |
@@ -56,7 +56,7 @@
 | 🎨 **Theme customization** | Material 3 with accent color picker and light / dark / system modes |
 | 🖥️ **Adaptive layout** | Bottom nav on mobile, collapsible sidebar on desktop |
 | ⌨️ **Hardware media keys** | Play/Pause, Next, Previous and Ctrl/Cmd+Arrow shortcuts |
-| 🔔 **Background audio** | Lock screen controls and notification player |
+| 🔔 **Background audio** | Persistent notification with play/pause/skip; lock screen controls; Bluetooth headset support |
 | 🎚️ **Equalizer** | Per-band EQ and Loudness Enhancer (Android only) |
 | 🔐 **Google Sign-In** | Link your Google account to unlock your personal YouTube library |
 

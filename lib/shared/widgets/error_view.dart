@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 
 /// Generic error view with a retry button.
 ///
@@ -17,6 +17,7 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final c = theme.extension<AroraTheme>()!.colors(context);
 
     return Center(
       child: Padding(
@@ -24,17 +25,17 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.wifi_off_rounded,
               size: 56,
-              color: AppColors.textSecondaryDark,
+              color: c.textSecondary,
             ),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
+                color: c.textSecondary,
               ),
             ),
             if (onRetry != null) ...[

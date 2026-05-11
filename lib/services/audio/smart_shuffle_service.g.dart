@@ -42,7 +42,7 @@ final class SmartShuffleServiceProvider
 }
 
 String _$smartShuffleServiceHash() =>
-    r'08de7bc1498be4ff597582bfe3d013f0f225d1d3';
+    r'faa1f08ef426410d328888816a0d0f5b12c7d42c';
 
 abstract class _$SmartShuffleService extends $Notifier<void> {
   void build();

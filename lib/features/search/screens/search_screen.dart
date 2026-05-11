@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/features/search/providers/search_history_notifier.dart';
 import 'package:arora/features/search/providers/search_providers.dart';
@@ -49,13 +49,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final c = theme.extension<AroraTheme>()!.colors(context);
     final query = ref.watch(searchQueryProvider);
     final songResults = ref.watch(songSearchResultsProvider);
     final albumResults = ref.watch(albumSearchResultsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
         title: TextField(
           controller: _controller,
           autofocus: true,
@@ -65,7 +66,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           decoration: InputDecoration(
             hintText: 'Search songs, artists, albums…',
             hintStyle: theme.textTheme.bodyLarge?.copyWith(
-              color: AppColors.textSecondaryDark,
+              color: c.textSecondary,
             ),
             border: InputBorder.none,
             suffixIcon: query.isNotEmpty
@@ -121,7 +122,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                     .read(audioPlayerServiceProvider)
                                     .play(songs[i]);
                                 _submitQuery(query);
-                                context.go('/player');
+                                context.push('/player');
                               },
                             ),
                             childCount: songs.length,
@@ -175,22 +176,19 @@ class _SearchHistoryView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(searchHistoryProvider);
     final theme = Theme.of(context);
+    final c = theme.extension<AroraTheme>()!.colors(context);
 
     if (history.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.search_rounded,
-              size: 64,
-              color: AppColors.textSecondaryDark,
-            ),
+            Icon(Icons.search_rounded, size: 64, color: c.textSecondary),
             const SizedBox(height: 16),
             Text(
               'Search for any song, artist, or album',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
+                color: c.textSecondary,
               ),
             ),
           ],
@@ -207,11 +205,11 @@ class _SearchHistoryView extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                'Recent searches',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: AppColors.textSecondaryDark,
+                  'Recent searches',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: c.textSecondary,
+                  ),
                 ),
-              ),
               ),
               TextButton(
                 onPressed: () =>
@@ -227,9 +225,9 @@ class _SearchHistoryView extends ConsumerWidget {
             itemBuilder: (context, i) {
               final query = history[i];
               return ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.history_rounded,
-                  color: AppColors.textSecondaryDark,
+                  color: c.textSecondary,
                 ),
                 title: Text(query, maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: IconButton(
@@ -257,7 +255,10 @@ class _NoResults extends StatelessWidget {
         child: Text(
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
+                color: Theme.of(context)
+                    .extension<AroraTheme>()!
+                    .colors(context)
+                    .textSecondary,
               ),
         ),
       );

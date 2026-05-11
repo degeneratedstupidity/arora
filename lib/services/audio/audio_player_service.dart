@@ -37,6 +37,7 @@ class AudioPlayerService {
   AudioPlayerService({
     required Ref ref,
     required GetStreamUrlUseCase getStreamUrl,
+    this.onMediaChanged,
   })  : _ref = ref,
         _getStreamUrl = getStreamUrl,
         _cache = ref.read(cacheServiceProvider) {
@@ -74,6 +75,13 @@ class AudioPlayerService {
     });
   }
 
+  /// Called whenever the song or play/pause state changes.
+  ///
+  /// Wired up by [audioPlayerServiceProvider] to [aroraAudioHandler.onSongChanged]
+  /// so the notification and lock screen stay in sync without a direct import
+  /// of [AudioServiceHandler] (which would create a circular dependency).
+  final void Function()? onMediaChanged;
+
   final Ref _ref;
   late final AudioPlayer _player;
   AndroidEqualizer? _equalizer;
@@ -88,6 +96,7 @@ class AudioPlayerService {
   LoopMode _loopMode = LoopMode.off;
   AudioQuality _quality = AudioQuality.high;
   bool _isFetchingRecs = false;
+  bool _isLoading = false;
   final Map<String, Future<String>> _pendingUrlFetches = {};
 
   /// StreamControllers that broadcast state changes to the UI.
@@ -125,6 +134,7 @@ class AudioPlayerService {
 
   Song? get currentSong => _ref.read(playbackQueueProvider).currentSong;
   bool get isPlaying => _player.playing;
+  bool get isLoading => _isLoading;
   bool get isShuffleEnabled => _ref.read(playbackQueueProvider).isSmartShuffleEnabled;
   LoopMode get loopMode => _loopMode;
   Duration get position => _player.position;
@@ -155,11 +165,14 @@ class AudioPlayerService {
   }
 
   Future<void> _loadAndPlaySong(Song song) async {
+    _isLoading = true;
     _isLoadingController.add(true);
 
     // Emit the song immediately so the player screen renders before URL fetch.
     _currentSong = song;
     _currentSongController.add(song);
+    // Notify the media session of the new track (artwork + title on lock screen).
+    onMediaChanged?.call();
 
     try {
       _log.info('play: ${song.title} by ${song.artistName}');
@@ -168,7 +181,7 @@ class AudioPlayerService {
       // - stop() silences the old song immediately (ghost playback fix)
       // - URL fetch starts concurrently so we don't waste the stop() time
       final urlFuture = _resolveUrl(song);
-      await _player.stop();       // waits for old audio to silence
+      await _player.stop();        // waits for old audio to silence
       final url = await urlFuture; // waits for URL (often already done)
 
       final AudioSource source = song.isDownloaded && song.localFilePath != null
@@ -181,6 +194,7 @@ class AudioPlayerService {
       _log.error('play failed for ${song.id}', error: e);
       _errorController.add('Could not play "${song.title}". Try again.');
     } finally {
+      _isLoading = false;
       _isLoadingController.add(false);
     }
   }
@@ -368,9 +382,10 @@ class AudioPlayerService {
 
   /// Sets up listeners on `just_audio` player state.
   void _initPlayerListeners() {
-    // Forward playing state to UI stream.
+    // Forward playing state to UI stream and keep notification in sync.
     _player.playingStream.listen((playing) {
       _isPlayingController.add(playing);
+      onMediaChanged?.call();
     });
 
     // Auto-advance to the next song when the current one finishes.

@@ -21,17 +21,23 @@ class SettingsAdapter extends TypeAdapter<Settings> {
           fields[0] == null ? AppThemeMode.system : fields[0] as AppThemeMode,
       accentColorValue:
           fields[1] == null ? 4278221516 : (fields[1] as num).toInt(),
+      themeId: fields[2] == null ? 'arora_dark' : fields[2] as String,
+      customThemesJson: fields[3] == null ? '[]' : fields[3] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, Settings obj) {
     writer
-      ..writeByte(2)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.themeMode)
       ..writeByte(1)
-      ..write(obj.accentColorValue);
+      ..write(obj.accentColorValue)
+      ..writeByte(2)
+      ..write(obj.themeId)
+      ..writeByte(3)
+      ..write(obj.customThemesJson);
   }
 
   @override

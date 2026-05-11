@@ -123,7 +123,8 @@ Always pass `artistHint` when you have a `Song` object — it prevents an extra 
 | `lib/infrastructure/youtube/youtube_explode_music_provider.dart` | Full YouTube implementation: search, stream URLs, metadata, lyrics, trending, Radio Mix recommendations |
 | `lib/services/audio/audio_player_service.dart` | Core engine: wraps `AudioPlayer`, manages queue listener, pre-fetches URLs, exposes reactive streams |
 | `lib/services/audio/playback_queue_notifier.dart` | `@Riverpod(keepAlive: true)` queue state — `playSong`, `playPlaylist`, `next` (wraps), `previous` |
-| `lib/services/audio/smart_shuffle_service.dart` | Watches queue; when ≤ 2 songs remain and shuffle is on, fetches `RD{id}` Radio Mix and appends |
+| `lib/services/audio/audio_service_handler.dart` | Global singleton `aroraAudioHandler` — bridges `AudioPlayerService` to `audio_service` via lazy `connect()` callbacks; `onSongChanged()` updates lock screen + notification |
+| `lib/services/audio/smart_shuffle_service.dart` | Watches queue; when ≤ 3 songs remain and shuffle is on, fetches Radio Mix (`RD{id}`); tracks `_recentSeeds` for variety; falls back to different-artist seed when primary mix is exhausted |
 | `lib/services/download/download_manager.dart` | Dio download with YouTube CDN headers; stores `Song(isDownloaded: true)` in `Box<Song>` |
 | `lib/features/home/providers/home_providers.dart` | `trendingProvider`, `genreSongsProvider`, `recommendedForYouProvider`, `recentlyPlayedProvider` |
 | `lib/features/player/providers/player_providers.dart` | `audioPlayerServiceProvider`, `currentSongProvider`, `isPlayingProvider`, `volumeProvider`, etc. |
@@ -177,11 +178,18 @@ Box names are constants on `HiveDatabase`:
 ### Skip on single-song queue
 When `skipNext()` is called with only 1 song queued, `PlaybackQueueNotifier.next()` would produce `(0+1) % 1 = 0` — identical Riverpod state — so the queue listener never fires. Instead, `skipNext()` detects this case, calls `musicProviderProvider.getRecommendations()` directly, appends results with `addAllLast()`, then advances. A race-condition guard (`latestQueue.currentSong?.id != currentSong.id`) aborts if the user started a different song during the async fetch.
 
+### Media session / lock screen (Android)
+`aroraAudioHandler` (global singleton in `audio_service_handler.dart`) is registered with `AudioService.init` at startup. After Riverpod creates `AudioPlayerService`, `player_providers.dart` calls `aroraAudioHandler.connect(...)` with plain closures — no direct import of `AudioPlayerService` in the handler (avoids circular imports). `AudioPlayerService` fires its `onMediaChanged` callback:
+- Immediately after emitting the new song to `_currentSongController` → lock screen artwork + title appear before URL resolves
+- From `playingStream` listener → notification play/pause button stays in sync
+`broadcastState()` emits `AudioProcessingState.loading` while the URL is being fetched so the notification shows a loading state rather than staying idle.
+
 ### Smart Shuffle
 - Enabled via `PlaybackQueueNotifier.toggleSmartShuffle()`
-- `SmartShuffleService` watches the queue; when `remaining ≤ 2` and shuffle is on, calls `getRecommendations(currentSong.id)`
-- `getRecommendations` fetches the YouTube Radio Mix playlist `RD{videoId}`, falling back to an artist name search
-- New songs are appended to the tail via `addAllLast()`, filtered for duplicates
+- `SmartShuffleService` watches the queue; when `remaining ≤ 3` and shuffle is on, calls `getRecommendations(currentSong.id)` (threshold was 2)
+- Fetches 15 songs per batch (was 10)
+- Tracks `_recentSeeds` (last 5 played songs, newest-first). When the primary Radio Mix returns < 3 new songs (exhausted), fetches from the most recent different-artist seed for variety — avoids doubling API calls on normal playback
+- New songs appended via `addAllLast()`, which deduplicates against the existing queue
 
 ---
 
@@ -265,7 +273,7 @@ Generated files (do not edit manually): `*.freezed.dart`, `*.g.dart`
 - `flutter build linux --debug` → **✓ Built** — 0 errors, 0 warnings
 - `JAVA_HOME=/opt/android-studio/jbr flutter build apk --debug` → **✓ Built** `app-debug.apk`
 - `flutter analyze` → 0 errors, 0 warnings (pre-existing style infos only)
-- All features confirmed working on **Linux and Android** (vivo 1920) as of May 2026
+- All features confirmed working on **Linux and Android** (vivo 1920) as of May 2026, including lock screen controls and notification player
 - **Stream type:** `manifest.muxed` (itag=18, video/mp4 96 kbps AAC). YouTube's CDN blocks audio-only opus/webm streams (itag=251) for external players (mpv, ExoPlayer) that lack YouTube session cookies. Muxed mp4 streams are freely accessible; just_audio/mpv/ExoPlayer extract the audio track automatically.
 - **Phase 1 OAuth implementation complete** — `YoutubeAuthService` / `_GoogleAccountTile` in Settings. The authenticated http.Client is **not** passed into `YoutubeExplode` (doing so caused 403s — the library's own cookie-based session is the correct credential mechanism). OAuth is useful for personal library access on Android; playback, search, and recommendations work without it.
 - Android Cloud Console: Firebase project `arora-495906`, SHA-1 fingerprint registered, `google-services.json` in `android/app/`. Test user `celeticcharger@gmail.com` whitelisted.
@@ -321,6 +329,9 @@ Follow these rules when modifying this codebase:
 **Audio service**
 - The singleton is `audioPlayerServiceProvider` in `lib/features/player/providers/player_providers.dart`.
 - Playback is driven through `PlaybackQueueNotifier`, not by calling `AudioPlayer` directly.
+- `aroraAudioHandler` (global in `audio_service_handler.dart`) is the `BaseAudioHandler` registered with `AudioService.init`. Wire it via `aroraAudioHandler.connect(...)` in the provider — never import `AudioPlayerService` directly into `audio_service_handler.dart` (circular import).
+- `AudioPlayerService.onMediaChanged` is a `void Function()?` callback fired on song change and play/pause toggle. Always pass `aroraAudioHandler.onSongChanged` here.
 
 **Imports**
 - Do not import `player_providers.dart` in `home_providers.dart` — this creates a circular dependency through `currentSongProvider`. The `recentlyPlayedProvider` listener belongs in `app.dart`, not in home providers.
+- Do not import `audio_player_service.dart` in `audio_service_handler.dart` — use the callback pattern via `connect()` instead.

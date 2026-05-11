@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:arora/core/theme/app_colors.dart';
 
-/// A branded loading indicator using [AppColors.primary].
+/// A branded loading indicator that uses the active theme's primary colour.
 ///
 /// Drop-in replacement for [CircularProgressIndicator] that respects
 /// Arora's design system.
@@ -15,8 +14,8 @@ class AroraLoadingIndicator extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: const CircularProgressIndicator(
-            color: AppColors.primary,
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
             strokeWidth: 2.5,
           ),
         ),

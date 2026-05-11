@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:arora/core/extensions/duration_extensions.dart';
 import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/song.dart';
 
 /// A reusable list tile for displaying a [Song].
@@ -27,33 +28,37 @@ class SongTile extends StatelessWidget {
   /// Shows an offline badge when `true`.
   final bool showDownloadBadge;
 
-  /// Highlights the tile in primary colour when `true`.
+  /// Highlights the tile in accent colour when `true`.
   final bool isPlaying;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textColor = isPlaying ? AppColors.primary : null;
+    final t = theme.extension<AroraTheme>()!;
+    final c = t.colors(context);
+    final textColor = isPlaying ? c.accent : null;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       onTap: onTap,
-      leading: _Thumbnail(url: song.thumbnailUrl, isPlaying: isPlaying),
+      leading: _Thumbnail(url: song.thumbnailUrl, isPlaying: isPlaying, colors: c),
       title: Text(
         song.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.titleSmall?.copyWith(color: textColor),
       ),
+      // Expanded prevents the subtitle row from overflowing when badges are
+      // present — the text takes remaining space and ellipsis handles overflow.
       subtitle: Row(
         children: [
-          Flexible(
+          Expanded(
             child: Text(
               song.artistName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
+                color: c.textSecondary,
               ),
             ),
           ),
@@ -67,10 +72,10 @@ class SongTile extends StatelessWidget {
           ],
           if (song.hasVideo) ...[
             const SizedBox(width: 6),
-            const Icon(
+            Icon(
               Icons.videocam_rounded,
               size: 14,
-              color: AppColors.textSecondaryDark,
+              color: c.textTertiary,
             ),
           ],
         ],
@@ -83,13 +88,13 @@ class SongTile extends StatelessWidget {
                 Text(
                   Duration(milliseconds: song.durationMs!).toMMSS(),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.textSecondaryDark,
+                    color: c.textSecondary,
                   ),
                 ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.more_vert_rounded,
-                color: AppColors.textSecondaryDark,
+                color: c.textSecondary,
                 size: 20,
               ),
             ],
@@ -99,9 +104,14 @@ class SongTile extends StatelessWidget {
 }
 
 class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({this.url, required this.isPlaying});
+  const _Thumbnail({
+    this.url,
+    required this.isPlaying,
+    required this.colors,
+  });
   final String? url;
   final bool isPlaying;
+  final AroraColors colors;
 
   @override
   Widget build(BuildContext context) {
@@ -125,12 +135,12 @@ class _Thumbnail extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: Colors.black45,
+              color: Colors.black.withAlpha(115),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.equalizer_rounded,
-              color: AppColors.primary,
+              color: colors.accent,
               size: 24,
             ),
           ),
@@ -142,12 +152,12 @@ class _Thumbnail extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: BoxDecoration(
-          color: AppColors.darkSurface,
+          color: colors.surfaceRaised,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.music_note_rounded,
-          color: AppColors.textSecondaryDark,
+          color: colors.textTertiary,
           size: 24,
         ),
       );

@@ -108,8 +108,11 @@ All requests share the same InnerTube context payload:
 | Step 9 — audio_service Android fix | ✅ Done | `MainActivity` → `AudioServiceActivity`; service + receiver in `AndroidManifest.xml` |
 | Step 10 — OAuth test user whitelist | ✅ Done | `celeticcharger@gmail.com` added to Cloud Console Test users |
 | End-to-end Android test | ✅ Confirmed | Audio (muxed mp4), search, auto-advance, Google Sign-In — all working on vivo 1920 |
+| Lock screen / notification controls | ✅ Fixed (Session 7) | `aroraAudioHandler` global singleton wired via `connect()` callbacks; `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permissions added; confirmed on vivo 1920 |
+| Smart Shuffle algorithm | ✅ Improved (Session 7) | Threshold 3, batch 15, `_recentSeeds` tracking, fallback different-artist seed; confirmed on vivo 1920 |
 | Build verification — Linux | ✅ Passing | `flutter build linux --debug` — 0 errors |
 | Build verification — Android | ✅ Passing | `JAVA_HOME=/opt/android-studio/jbr flutter build apk --debug` — ✓ Built `app-debug.apk` |
+| `flutter analyze` | ✅ Clean | 0 errors, 0 warnings (pre-existing style infos only) |
 | **Open issues** | ⚠️ | `RenderFlex` overflow in `song_tile.dart:48`; video stream 403 on Android |
 
 ### Session 6 — CDN Stream Access Discovery (May 2026)

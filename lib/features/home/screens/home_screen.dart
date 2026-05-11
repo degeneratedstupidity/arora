@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/app_spacing.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/features/home/providers/home_providers.dart';
 import 'package:arora/features/home/widgets/trending_rail.dart';
 import 'package:arora/shared/widgets/error_view.dart';
@@ -16,6 +17,8 @@ class HomeScreen extends ConsumerWidget {
     final recommended = ref.watch(recommendedForYouProvider);
     final recentlyPlayed = ref.watch(recentlyPlayedProvider);
     final theme = Theme.of(context);
+    final t = theme.extension<AroraTheme>()!;
+    final c = t.colors(context);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -30,20 +33,20 @@ class HomeScreen extends ConsumerWidget {
           SliverAppBar(
             floating: true,
             snap: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            backgroundColor: theme.scaffoldBackgroundColor,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   greeting,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondaryDark,
+                    color: c.textSecondary,
                   ),
                 ),
                 Text(
                   'Arora',
                   style: theme.textTheme.headlineMedium?.copyWith(
-                    color: AppColors.primary,
+                    color: c.textPrimary,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   ),
@@ -67,29 +70,28 @@ class HomeScreen extends ConsumerWidget {
           // ── Search shortcut card ──────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0,
+              ),
               child: GestureDetector(
                 onTap: () => context.go('/search'),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: AppSpacing.md,
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.darkSurface,
-                    borderRadius: BorderRadius.circular(14),
+                    color: c.surface,
+                    borderRadius: t.shapes.sm,
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.textSecondaryDark,
-                      ),
+                      Icon(Icons.search_rounded, color: c.textSecondary),
                       const SizedBox(width: 12),
                       Text(
                         'Search songs, artists, albums…',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondaryDark,
+                          color: c.textSecondary,
                         ),
                       ),
                     ],
@@ -179,7 +181,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
+        padding: EdgeInsets.fromLTRB(AppSpacing.md, topPadding, AppSpacing.md, 8),
         child: Text(
           title,
           maxLines: 1,

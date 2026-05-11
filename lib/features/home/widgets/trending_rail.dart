@@ -30,7 +30,7 @@ class TrendingRail extends ConsumerWidget {
                     songs,
                     startWith: songs[index],
                   );
-              context.go('/player');
+              context.push('/player');
             },
           );
         },

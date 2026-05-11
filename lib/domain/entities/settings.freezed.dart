@@ -14,13 +14,21 @@ T _$identity<T>(T value) => value;
 
 /// @nodoc
 mixin _$Settings {
-  /// User's preferred theme mode (defaults to system).
+  /// Light / dark / system mode.
   @HiveField(0)
   AppThemeMode get themeMode;
 
-  /// Primary accent color as an integer (defaults to a vivid blue: 0xFF007ACC).
+  /// Legacy accent color int — kept for binary compat, no longer shown in UI.
   @HiveField(1)
   int get accentColorValue;
+
+  /// ID of the active [AroraTheme]. Defaults to the built-in dark theme.
+  @HiveField(2)
+  String get themeId;
+
+  /// JSON-encoded list of user-imported [AroraTheme] objects.
+  @HiveField(3)
+  String get customThemesJson;
 
   /// Create a copy of Settings
   /// with the given fields replaced by the non-null parameter values.
@@ -37,15 +45,19 @@ mixin _$Settings {
             (identical(other.themeMode, themeMode) ||
                 other.themeMode == themeMode) &&
             (identical(other.accentColorValue, accentColorValue) ||
-                other.accentColorValue == accentColorValue));
+                other.accentColorValue == accentColorValue) &&
+            (identical(other.themeId, themeId) || other.themeId == themeId) &&
+            (identical(other.customThemesJson, customThemesJson) ||
+                other.customThemesJson == customThemesJson));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, themeMode, accentColorValue);
+  int get hashCode => Object.hash(
+      runtimeType, themeMode, accentColorValue, themeId, customThemesJson);
 
   @override
   String toString() {
-    return 'Settings(themeMode: $themeMode, accentColorValue: $accentColorValue)';
+    return 'Settings(themeMode: $themeMode, accentColorValue: $accentColorValue, themeId: $themeId, customThemesJson: $customThemesJson)';
   }
 }
 
@@ -56,7 +68,9 @@ abstract mixin class $SettingsCopyWith<$Res> {
   @useResult
   $Res call(
       {@HiveField(0) AppThemeMode themeMode,
-      @HiveField(1) int accentColorValue});
+      @HiveField(1) int accentColorValue,
+      @HiveField(2) String themeId,
+      @HiveField(3) String customThemesJson});
 }
 
 /// @nodoc
@@ -73,6 +87,8 @@ class _$SettingsCopyWithImpl<$Res> implements $SettingsCopyWith<$Res> {
   $Res call({
     Object? themeMode = null,
     Object? accentColorValue = null,
+    Object? themeId = null,
+    Object? customThemesJson = null,
   }) {
     return _then(_self.copyWith(
       themeMode: null == themeMode
@@ -83,6 +99,14 @@ class _$SettingsCopyWithImpl<$Res> implements $SettingsCopyWith<$Res> {
           ? _self.accentColorValue
           : accentColorValue // ignore: cast_nullable_to_non_nullable
               as int,
+      themeId: null == themeId
+          ? _self.themeId
+          : themeId // ignore: cast_nullable_to_non_nullable
+              as String,
+      customThemesJson: null == customThemesJson
+          ? _self.customThemesJson
+          : customThemesJson // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -180,15 +204,19 @@ extension SettingsPatterns on Settings {
 
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(@HiveField(0) AppThemeMode themeMode,
-            @HiveField(1) int accentColorValue)?
+    TResult Function(
+            @HiveField(0) AppThemeMode themeMode,
+            @HiveField(1) int accentColorValue,
+            @HiveField(2) String themeId,
+            @HiveField(3) String customThemesJson)?
         $default, {
     required TResult orElse(),
   }) {
     final _that = this;
     switch (_that) {
       case _Settings() when $default != null:
-        return $default(_that.themeMode, _that.accentColorValue);
+        return $default(_that.themeMode, _that.accentColorValue, _that.themeId,
+            _that.customThemesJson);
       case _:
         return orElse();
     }
@@ -209,14 +237,18 @@ extension SettingsPatterns on Settings {
 
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(@HiveField(0) AppThemeMode themeMode,
-            @HiveField(1) int accentColorValue)
+    TResult Function(
+            @HiveField(0) AppThemeMode themeMode,
+            @HiveField(1) int accentColorValue,
+            @HiveField(2) String themeId,
+            @HiveField(3) String customThemesJson)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _Settings():
-        return $default(_that.themeMode, _that.accentColorValue);
+        return $default(_that.themeMode, _that.accentColorValue, _that.themeId,
+            _that.customThemesJson);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -236,14 +268,18 @@ extension SettingsPatterns on Settings {
 
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(@HiveField(0) AppThemeMode themeMode,
-            @HiveField(1) int accentColorValue)?
+    TResult? Function(
+            @HiveField(0) AppThemeMode themeMode,
+            @HiveField(1) int accentColorValue,
+            @HiveField(2) String themeId,
+            @HiveField(3) String customThemesJson)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _Settings() when $default != null:
-        return $default(_that.themeMode, _that.accentColorValue);
+        return $default(_that.themeMode, _that.accentColorValue, _that.themeId,
+            _that.customThemesJson);
       case _:
         return null;
     }
@@ -255,20 +291,34 @@ extension SettingsPatterns on Settings {
 class _Settings extends Settings {
   const _Settings(
       {@HiveField(0) this.themeMode = AppThemeMode.system,
-      @HiveField(1) this.accentColorValue = 0xFF007ACC})
+      @HiveField(1) this.accentColorValue = 0xFF007ACC,
+      @HiveField(2) this.themeId = 'arora_dark',
+      @HiveField(3) this.customThemesJson = '[]'})
       : super._();
 
-  /// User's preferred theme mode (defaults to system).
+  /// Light / dark / system mode.
   @override
   @JsonKey()
   @HiveField(0)
   final AppThemeMode themeMode;
 
-  /// Primary accent color as an integer (defaults to a vivid blue: 0xFF007ACC).
+  /// Legacy accent color int — kept for binary compat, no longer shown in UI.
   @override
   @JsonKey()
   @HiveField(1)
   final int accentColorValue;
+
+  /// ID of the active [AroraTheme]. Defaults to the built-in dark theme.
+  @override
+  @JsonKey()
+  @HiveField(2)
+  final String themeId;
+
+  /// JSON-encoded list of user-imported [AroraTheme] objects.
+  @override
+  @JsonKey()
+  @HiveField(3)
+  final String customThemesJson;
 
   /// Create a copy of Settings
   /// with the given fields replaced by the non-null parameter values.
@@ -286,15 +336,19 @@ class _Settings extends Settings {
             (identical(other.themeMode, themeMode) ||
                 other.themeMode == themeMode) &&
             (identical(other.accentColorValue, accentColorValue) ||
-                other.accentColorValue == accentColorValue));
+                other.accentColorValue == accentColorValue) &&
+            (identical(other.themeId, themeId) || other.themeId == themeId) &&
+            (identical(other.customThemesJson, customThemesJson) ||
+                other.customThemesJson == customThemesJson));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, themeMode, accentColorValue);
+  int get hashCode => Object.hash(
+      runtimeType, themeMode, accentColorValue, themeId, customThemesJson);
 
   @override
   String toString() {
-    return 'Settings(themeMode: $themeMode, accentColorValue: $accentColorValue)';
+    return 'Settings(themeMode: $themeMode, accentColorValue: $accentColorValue, themeId: $themeId, customThemesJson: $customThemesJson)';
   }
 }
 
@@ -307,7 +361,9 @@ abstract mixin class _$SettingsCopyWith<$Res>
   @useResult
   $Res call(
       {@HiveField(0) AppThemeMode themeMode,
-      @HiveField(1) int accentColorValue});
+      @HiveField(1) int accentColorValue,
+      @HiveField(2) String themeId,
+      @HiveField(3) String customThemesJson});
 }
 
 /// @nodoc
@@ -324,6 +380,8 @@ class __$SettingsCopyWithImpl<$Res> implements _$SettingsCopyWith<$Res> {
   $Res call({
     Object? themeMode = null,
     Object? accentColorValue = null,
+    Object? themeId = null,
+    Object? customThemesJson = null,
   }) {
     return _then(_Settings(
       themeMode: null == themeMode
@@ -334,6 +392,14 @@ class __$SettingsCopyWithImpl<$Res> implements _$SettingsCopyWith<$Res> {
           ? _self.accentColorValue
           : accentColorValue // ignore: cast_nullable_to_non_nullable
               as int,
+      themeId: null == themeId
+          ? _self.themeId
+          : themeId // ignore: cast_nullable_to_non_nullable
+              as String,
+      customThemesJson: null == customThemesJson
+          ? _self.customThemesJson
+          : customThemesJson // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }

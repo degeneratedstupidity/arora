@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- Required for audio_service background playback + lock screen controls -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <!-- Required on Android 14+ (API 34+) for media playback foreground services -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <application
         android:label="arora"
         android:name="${applicationName}"
@@ -30,6 +35,7 @@
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
+            android:foregroundServiceType="mediaPlayback"
             tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />

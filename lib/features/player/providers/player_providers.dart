@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:arora/domain/entities/song.dart';
 import 'package:arora/domain/usecases/get_stream_url_usecase.dart';
 import 'package:arora/services/audio/audio_player_service.dart';
+import 'package:arora/services/audio/audio_service_handler.dart';
 import 'package:arora/services/audio/smart_shuffle_service.dart';
 import 'package:arora/services/download/download_manager.dart';
 import 'package:arora/shared/providers/music_provider_provider.dart';
@@ -23,7 +24,28 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService(
     ref: ref,
     getStreamUrl: getStreamUrl,
+    // onMediaChanged fires on song change and play/pause toggle.
+    // Calling aroraAudioHandler.onSongChanged() keeps the Android notification,
+    // lock screen, and Bluetooth controls in sync with actual playback state.
+    onMediaChanged: aroraAudioHandler.onSongChanged,
   );
+
+  // Wire aroraAudioHandler so lock-screen / headset commands reach the service.
+  aroraAudioHandler.connect(
+    onPlay: service.resume,
+    onPause: service.pause,
+    onSkipNext: service.skipNext,
+    onSkipPrevious: service.skipPrevious,
+    onSeek: service.seek,
+    onFastForward: service.seekForward,
+    onRewind: service.seekBackward,
+    getIsPlaying: () => service.isPlaying,
+    getIsLoading: () => service.isLoading,
+    getPosition: () => service.position,
+    getDuration: () => service.duration,
+    getMediaItem: () => service.currentMediaItem,
+  );
+
   ref.onDispose(service.dispose);
   // Eagerly initialize SmartShuffleService so its queue listener is active.
   ref.read(smartShuffleServiceProvider);

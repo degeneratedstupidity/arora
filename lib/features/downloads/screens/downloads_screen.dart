@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/features/downloads/providers/download_providers.dart';
 import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/shared/widgets/error_view.dart';
@@ -15,11 +15,13 @@ class DownloadsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(downloadedSongsProvider);
+    final theme = Theme.of(context);
+    final c = theme.extension<AroraTheme>()!.colors(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Downloads'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
       ),
       body: songsAsync.when(
         loading: () => const AroraLoadingIndicator(),
@@ -33,17 +35,22 @@ class DownloadsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.download_outlined,
-                      size: 64, color: AppColors.textSecondaryDark,),
+                  Icon(Icons.download_outlined,
+                      size: 64, color: c.textSecondary,),
                   const SizedBox(height: 16),
                   Text(
                     'No downloads yet',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondaryDark,
-                        ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: c.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  const Text('Tap ⬇ on any song to download it'),
+                  Text(
+                    'Tap ⬇ on any song to download it',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: c.textTertiary,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -57,7 +64,7 @@ class DownloadsScreen extends ConsumerWidget {
               showDownloadBadge: true,
               onTap: () {
                 ref.read(audioPlayerServiceProvider).play(songs[i]);
-                context.go('/player');
+                context.push('/player');
               },
             ),
           );

@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/album.dart';
 
 /// A vertical card displaying an [Album]'s cover art, title, and artist.
@@ -21,6 +21,8 @@ class AlbumCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = theme.extension<AroraTheme>()!;
+    final c = t.colors(context);
 
     return GestureDetector(
       onTap: onTap,
@@ -38,9 +40,9 @@ class AlbumCard extends StatelessWidget {
                       width: width,
                       height: width,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _placeholder(width),
+                      errorWidget: (_, __, ___) => _placeholder(c, width),
                     )
-                  : _placeholder(width),
+                  : _placeholder(c, width),
             ),
             const SizedBox(height: 8),
             // Title
@@ -56,7 +58,7 @@ class AlbumCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
+                color: c.textSecondary,
               ),
             ),
           ],
@@ -65,16 +67,16 @@ class AlbumCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(double size) => Container(
+  Widget _placeholder(AroraColors c, double size) => Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: AppColors.darkSurfaceElevated,
+          color: c.surfaceRaised,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.album_rounded,
-          color: AppColors.textSecondaryDark,
+          color: c.textTertiary,
           size: 40,
         ),
       );

@@ -57,6 +57,7 @@ dependencies:
   cached_network_image: ^3.4.1   # Efficient album art + thumbnail loading & caching
   google_fonts: ^6.2.1           # Inter / Outfit typefaces
   window_manager: ^0.4.3         # Desktop: frameless window + custom title bar
+  file_picker: ^8.1.0            # Theme import — file dialog on Linux + Android
 
   # ── Data Classes ──────────────────────────────────────────────────────────
   freezed_annotation: ^3.1.0     # Immutable entity/model code-gen annotations

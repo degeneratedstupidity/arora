@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:arora/core/theme/app_colors.dart';
 import 'package:arora/services/playlist_import_service.dart';
 import 'package:arora/shared/widgets/arora_image.dart';
+import 'package:arora/shared/widgets/loading_indicator.dart';
 
 class ImportPlaylistScreen extends ConsumerStatefulWidget {
   const ImportPlaylistScreen({super.key});
 
   @override
-  ConsumerState<ImportPlaylistScreen> createState() => _ImportPlaylistScreenState();
+  ConsumerState<ImportPlaylistScreen> createState() =>
+      _ImportPlaylistScreenState();
 }
 
 class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
@@ -50,7 +53,9 @@ class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
                 FilledButton(
                   onPressed: () {
                     FocusScope.of(context).unfocus();
-                    ref.read(playlistImportProvider.notifier).importFromUrl(_urlController.text);
+                    ref
+                        .read(playlistImportProvider.notifier)
+                        .importFromUrl(_urlController.text);
                   },
                   child: const Text('Import'),
                 ),
@@ -69,10 +74,26 @@ class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
                           itemBuilder: (context, index) {
                             final song = songs[index];
                             return ListTile(
-                              leading: AroraImage(imageUrl: song.thumbnailUrl, width: 48, height: 48, borderRadius: 8),
-                              title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(song.artistName),
-                              trailing: const Icon(Icons.check_circle, color: Colors.green),
+                              leading: AroraImage(
+                                imageUrl: song.thumbnailUrl,
+                                width: 48,
+                                height: 48,
+                                borderRadius: 8,
+                              ),
+                              title: Text(
+                                song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                song.artistName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: const Icon(
+                                Icons.check_circle,
+                                color: AppColors.success,
+                              ),
                             );
                           },
                         ),
@@ -82,13 +103,17 @@ class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
                         width: double.infinity,
                         child: FilledButton.icon(
                           onPressed: () {
-                            ref.read(playlistImportProvider.notifier).saveToLibrary(songs);
+                            ref
+                                .read(playlistImportProvider.notifier)
+                                .saveToLibrary(songs);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Saved ${songs.length} songs to Library!')),
+                              SnackBar(
+                                content: Text(
+                                  'Saved ${songs.length} songs to Library!',
+                                ),
+                              ),
                             );
-                            if (context.canPop()) {
-                              context.pop();
-                            }
+                            if (context.canPop()) context.pop();
                           },
                           icon: const Icon(Icons.save_alt_rounded),
                           label: Text('Save ${songs.length} Songs to Library'),
@@ -97,8 +122,13 @@ class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
                     ],
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, st) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
+                loading: () => const AroraLoadingIndicator(),
+                error: (err, _) => Center(
+                  child: Text(
+                    'Error: $err',
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
               ),
             ),
           ],

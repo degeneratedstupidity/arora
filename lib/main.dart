@@ -10,6 +10,7 @@ import 'package:arora/app.dart';
 import 'package:arora/data/datasources/local/hive_database.dart';
 import 'package:arora/infrastructure/auth/auth_providers.dart';
 import 'package:arora/infrastructure/auth/youtube_auth_service.dart';
+import 'package:arora/services/audio/audio_service_handler.dart';
 
 /// Entry point for Arora.
 ///
@@ -64,9 +65,12 @@ Future<void> main() async {
     debugPrint('[Arora] Auth init error (guest mode): $e');
   }
 
-  // 3. Register AudioServiceHandler with audio_service.
+  // 3. Register the real AudioServiceHandler with audio_service.
+  //    aroraAudioHandler is a global singleton defined in audio_service_handler.dart.
+  //    Its callbacks are wired to AudioPlayerService later in player_providers.dart
+  //    after Riverpod initialises, so there is no circular dependency.
   await AudioService.init(
-    builder: () => _MinimalAudioHandler(),
+    builder: () => aroraAudioHandler,
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.arora.audio',
       androidNotificationChannelName: 'Arora Audio',
@@ -113,16 +117,3 @@ Future<void> main() async {
   );
 }
 
-
-/// A minimal [BaseAudioHandler] used for AudioService.init().
-///
-/// The full handler ([AudioServiceHandler]) is instantiated lazily by
-/// [audioPlayerServiceProvider]. This stub ensures audio_service is
-/// registered at startup without circular dependency issues.
-class _MinimalAudioHandler extends BaseAudioHandler {
-  @override
-  Future<void> play() async {}
-
-  @override
-  Future<void> pause() async {}
-}

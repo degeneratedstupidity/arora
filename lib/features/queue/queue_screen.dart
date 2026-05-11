@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:arora/core/extensions/duration_extensions.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/song.dart';
 import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/services/audio/playback_queue_notifier.dart';
 import 'package:arora/shared/widgets/arora_image.dart';
-import 'package:arora/core/extensions/duration_extensions.dart';
 
 class QueueScreen extends ConsumerWidget {
   const QueueScreen({super.key});
@@ -69,7 +70,7 @@ class QueueScreen extends ConsumerWidget {
                     child: _QueueTile(
                       song: queue.currentSong!,
                       isPlaying: true,
-                      onTap: () => context.go('/player'),
+                      onTap: () => context.push('/player'),
                     ),
                   ),
 
@@ -100,7 +101,7 @@ class QueueScreen extends ConsumerWidget {
                       ref
                           .read(audioPlayerServiceProvider)
                           .play(upcomingSongs[i]);
-                      context.go('/player');
+                      context.push('/player');
                     },
                   ),
                 ),
@@ -177,8 +178,14 @@ class _QueueTile extends StatelessWidget {
                   color: colorScheme.primary.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.graphic_eq_rounded,
-                    color: Colors.white, size: 20,),
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: Theme.of(context)
+                      .extension<AroraTheme>()!
+                      .colors(context)
+                      .playButtonFg,
+                  size: 20,
+                ),
               ),
             ),
         ],
