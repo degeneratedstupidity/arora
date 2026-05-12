@@ -136,10 +136,42 @@ jobs:
           path: arora-linux-x86_64.AppImage
           retention-days: 1
 
+  # ── Windows Executable ─────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable Windows desktop target
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Archive Windows Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: build\windows\x64\runner\Release
+          retention-days: 1
+
   # ── GitHub Release ─────────────────────────────────────────────────────────
   release:
     name: Create GitHub Release
-    needs: [build-android, build-linux]
+    needs: [build-android, build-linux, build-windows]
     runs-on: ubuntu-latest
 
     steps:
@@ -153,10 +185,19 @@ jobs:
         with:
           name: linux-appimage
 
+      - name: Download Windows Executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-executable
+          path: windows-release
+
       - name: Rename assets with version tag
         run: |
           mv app-release.apk arora-${{ github.ref_name }}-android.apk
           mv arora-linux-x86_64.AppImage arora-${{ github.ref_name }}-linux-x86_64.AppImage
+          cd windows-release
+          zip -r ../arora-${{ github.ref_name }}-windows.zip ./*
+          cd ..
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -181,7 +222,11 @@ jobs:
             # Run
             ./arora-${{ github.ref_name }}-linux-x86_64.AppImage
             ```
+
+            ### Windows
+            Download and extract `arora-${{ github.ref_name }}-windows.zip`, then run `arora.exe`.
           files: |
             arora-${{ github.ref_name }}-android.apk
             arora-${{ github.ref_name }}-linux-x86_64.AppImage
+            arora-${{ github.ref_name }}-windows.zip
           generate_release_notes: true
