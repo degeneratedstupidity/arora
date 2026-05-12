@@ -1,6 +1,6 @@
 # Arora — CLAUDE.md
 
-Single source of truth for AI agents. Read this file instead of PROJECT_OVERVIEW.md, IMPLEMENTATION_PLAN.md, README.md, or the memory files. Everything here is current as of Session 8 (May 2026).
+Single source of truth for AI agents. Read this file instead of PROJECT_OVERVIEW.md, IMPLEMENTATION_PLAN.md, README.md, or the memory files. Everything here is current as of Session 9 (May 2026).
 
 ---
 
@@ -33,7 +33,9 @@ flutter analyze    # must return 0 errors, 0 warnings
 
 **Current build status:** Both Linux and Android build clean — 0 errors, 0 warnings. `flutter analyze` clean.
 
-**UI redesign status (Session 8):** All 4 steps complete — Design Tokens, Mini Player, Now Playing, and Gestures & Physics. Full UI redesign done. `flutter analyze` returns 0 errors, confirmed on Android (vivo 1920) with zero runtime errors.
+**Current version:** `1.1.0+2` (pubspec.yaml). Tagged `v1.1.0` on GitHub; CI builds release APK + AppImage automatically on tag push.
+
+**UI redesign status:** All 4 steps complete (Session 8). Playlist fixes applied (Session 9). Zero runtime errors confirmed on Android (vivo 1920).
 
 ---
 
@@ -174,6 +176,8 @@ The generated provider name is the class name with `Notifier` stripped:
 | `lib/infrastructure/youtube/youtube_explode_music_provider.dart` | Full YouTube impl. Uses muxed streams. Radio Mix `RD{videoId}` for recommendations. |
 | `lib/data/datasources/local/hive_database.dart` | Opens all boxes, registers adapters, self-heals stale `.lock` files |
 | `lib/features/home/providers/home_providers.dart` | `trendingProvider`, `genreSongsProvider`, `recommendedForYouProvider`, `recentlyPlayedProvider` |
+| `lib/shared/utils/bottom_sheet_utils.dart` | `showSongOptionsMenu`, `showAddToPlaylistSheet` — shared bottom sheet helpers |
+| `.github/workflows/release.yml` | CI: builds release APK + Linux AppImage on `v*` tag push; creates GitHub Release |
 
 ---
 
@@ -410,6 +414,9 @@ Users import via **Settings → Import**.
 | Google Sign-In | ✅ Android; not supported on Linux |
 | Lock screen + notification controls | ✅ Android (confirmed vivo 1920) |
 | Song tile overflow | ✅ Fixed (Session 8) — `Flexible` → `Expanded` in subtitle Row |
+| Playlist song tap crash | ✅ Fixed (Session 9) — `itemBuilder: (context, i)` shadowed outer context; renamed to `_` |
+| Playlist song count stale | ✅ Fixed (Session 9) — `addSong`/`removeSong`/`reorder` now invalidate `playlistsProvider` |
+| Song tile `...` menu non-functional | ✅ Fixed (Session 9) — converted to `ConsumerWidget`, wired to `showSongOptionsMenu` |
 | Equalizer button in Settings | ⚠️ Route exists but no tile links to it |
 
 ---
@@ -430,7 +437,7 @@ Users import via **Settings → Import**.
 | Platform | Status |
 |---|---|
 | Linux (x86_64) | ✅ Fully working. Requires `sudo pacman -S mpv`. GTK/ATK warnings on launch are harmless. |
-| Android | ✅ Confirmed on vivo 1920 (Android 12, API 31). Zero runtime errors (Session 8). Open: video-only 403. |
+| Android | ✅ Confirmed on vivo 1920 (Android 12, API 31). Zero runtime errors (Sessions 8–9). Open: video-only 403. |
 | iOS | Not tested. |
 | macOS / Windows | Should work — untested. |
 | Web | Partial; `window_manager` / `system_tray` guarded by `isDesktop`. |
@@ -438,6 +445,14 @@ Users import via **Settings → Import**.
 ---
 
 ## AI Agent Rules
+
+### Shared utilities — `lib/shared/utils/`
+
+| File | Exports |
+|---|---|
+| `bottom_sheet_utils.dart` | `showSongOptionsMenu(context, ref, song, c)` — opens a bottom sheet with "View Queue" and "Add to Playlist" options. `showAddToPlaylistSheet(context, ref, song, c)` — shows the playlist picker. Use these everywhere instead of inline implementations. |
+
+**SongTile** is now a `ConsumerWidget`. Its `...` icon opens `showSongOptionsMenu`. Do not revert to `StatelessWidget`.
 
 ### Navigation — CRITICAL
 - Always use `context.push('/player')` when navigating to the Now Playing screen. **Never** use `context.go('/player')`.
