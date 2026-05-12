@@ -13,7 +13,7 @@ import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/song.dart';
 import 'package:arora/domain/usecases/get_video_url_usecase.dart';
 import 'package:arora/features/downloads/providers/download_providers.dart';
-import 'package:arora/features/library/providers/library_providers.dart';
+
 import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/features/player/screens/lyrics_screen.dart';
 import 'package:arora/features/player/widgets/player_controls.dart';
@@ -22,6 +22,7 @@ import 'package:arora/shared/widgets/error_view.dart';
 import 'package:arora/shared/widgets/loading_indicator.dart';
 import 'package:arora/features/player/widgets/blurred_background.dart';
 import 'package:arora/shared/widgets/spring_button.dart';
+import 'package:arora/shared/utils/bottom_sheet_utils.dart';
 
 /// Full-screen Now Playing screen.
 ///
@@ -203,12 +204,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (ctx, scrollController) => Container(
+      builder: (_) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        return Container(
+          height: screenHeight * 0.7,
           decoration: BoxDecoration(
             color: c.surfaceRaised,
             borderRadius: const BorderRadius.vertical(
@@ -237,170 +236,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
               const Expanded(child: LyricsView()),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  void _showOptionsMenu(
-      BuildContext context, WidgetRef ref, Song song, AroraColors c,) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: c.surfaceRaised,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.radiusLg),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: c.surfaceHighest,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ListTile(
-              leading: Icon(Icons.queue_music_rounded, color: c.textSecondary),
-              title: Text('View Queue',
-                  style: TextStyle(color: c.textPrimary),),
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/queue');
-              },
-            ),
-            ListTile(
-              leading:
-                  Icon(Icons.playlist_add_rounded, color: c.textSecondary),
-              title: Text('Add to Playlist',
-                  style: TextStyle(color: c.textPrimary),),
-              onTap: () {
-                Navigator.pop(context);
-                _showAddToPlaylistSheet(context, ref, song, c);
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddToPlaylistSheet(
-      BuildContext context, WidgetRef ref, Song song, AroraColors c,) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: c.surfaceRaised,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.radiusLg),
-          ),
-        ),
-        child: Consumer(
-          builder: (_, ref, __) {
-            final playlistsAsync = ref.watch(playlistsProvider);
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(0, AppSpacing.md, 0, AppSpacing.xl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: c.surfaceHighest,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Add to Playlist',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(color: c.textPrimary),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  playlistsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(AppSpacing.xl),
-                      child: AroraLoadingIndicator(),
-                    ),
-                    error: (_, __) => Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Text(
-                        'Could not load playlists.',
-                        style: TextStyle(color: c.textSecondary),
-                      ),
-                    ),
-                    data: (playlists) {
-                      if (playlists.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(
-                            'No playlists yet.\nCreate one in the Library tab first.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: c.textSecondary),
-                          ),
-                        );
-                      }
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: playlists
-                            .map(
-                              (pl) => ListTile(
-                                leading: Icon(
-                                  Icons.queue_music_rounded,
-                                  color: c.accent,
-                                ),
-                                title: Text(
-                                  pl.title,
-                                  style: TextStyle(color: c.textPrimary),
-                                ),
-                                subtitle: Text(
-                                  '${pl.songs.length} songs',
-                                  style: TextStyle(
-                                    color: c.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                onTap: () async {
-                                  Navigator.pop(ctx);
-                                  await ref
-                                      .read(playlistNotifierProvider.notifier)
-                                      .addSong(pl.id, song);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Added "${song.title}" to ${pl.title}',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -490,8 +327,7 @@ class _TopBar extends ConsumerWidget {
             pressedScale: 0.85,
             onTap: () {
               final t = Theme.of(context).extension<AroraTheme>()!;
-              final state = context.findAncestorStateOfType<_NowPlayingScreenState>();
-              state?._showOptionsMenu(context, ref, song, t.colors(context));
+              showSongOptionsMenu(context, ref, song, t.colors(context));
             },
             child: SizedBox(
               width: AppSpacing.touchTarget,

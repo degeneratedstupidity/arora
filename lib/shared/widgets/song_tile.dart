@@ -1,15 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:arora/core/extensions/duration_extensions.dart';
 import 'package:arora/core/theme/app_colors.dart';
 import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/song.dart';
+import 'package:arora/shared/utils/bottom_sheet_utils.dart';
 
 /// A reusable list tile for displaying a [Song].
 ///
 /// Used across Home, Search, Playlists, and Downloads screens.
 /// Shows thumbnail, title, artist, duration, and an overflow menu.
-class SongTile extends StatelessWidget {
+class SongTile extends ConsumerWidget {
   const SongTile({
     super.key,
     required this.song,
@@ -32,7 +34,7 @@ class SongTile extends StatelessWidget {
   final bool isPlaying;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final t = theme.extension<AroraTheme>()!;
     final c = t.colors(context);
@@ -91,11 +93,16 @@ class SongTile extends StatelessWidget {
                     color: c.textSecondary,
                   ),
                 ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.more_vert_rounded,
-                color: c.textSecondary,
-                size: 20,
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: () => showSongOptionsMenu(context, ref, song, c),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: c.textSecondary,
+                  size: 20,
+                ),
               ),
             ],
           ),

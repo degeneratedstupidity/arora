@@ -43,12 +43,14 @@ class PlaylistNotifier extends AsyncNotifier<void> {
     final repo = ref.read(playlistRepositoryProvider);
     await repo.addSongToPlaylist(playlistId, song);
     ref.invalidate(playlistDetailProvider(playlistId));
+    ref.invalidate(playlistsProvider);
   }
 
   Future<void> removeSong(String playlistId, String songId) async {
     final repo = ref.read(playlistRepositoryProvider);
     await repo.removeSongFromPlaylist(playlistId, songId);
     ref.invalidate(playlistDetailProvider(playlistId));
+    ref.invalidate(playlistsProvider);
   }
 
   Future<void> delete(String playlistId) async {
@@ -61,6 +63,7 @@ class PlaylistNotifier extends AsyncNotifier<void> {
     final repo = ref.read(playlistRepositoryProvider);
     await repo.reorderPlaylist(playlistId, songIds);
     ref.invalidate(playlistDetailProvider(playlistId));
+    ref.invalidate(playlistsProvider);
   }
 }
 
