@@ -161,12 +161,10 @@ class LibraryScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (context, scrollController) => Container(
+      builder: (_) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        return Container(
+          height: screenHeight * 0.7,
           decoration: BoxDecoration(
             color: c.surfaceRaised,
             borderRadius: const BorderRadius.vertical(
@@ -235,9 +233,8 @@ class LibraryScreen extends ConsumerWidget {
               else
                 Expanded(
                   child: ListView.builder(
-                    controller: scrollController,
                     itemCount: playlist.songs.length,
-                    itemBuilder: (context, i) => _PlaylistSongTile(
+                    itemBuilder: (_, i) => _PlaylistSongTile(
                       song: playlist.songs[i],
                       colors: c,
                       onTap: () {
@@ -253,8 +250,8 @@ class LibraryScreen extends ConsumerWidget {
                 ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
