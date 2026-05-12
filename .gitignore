@@ -153,3 +153,4 @@ coverage/
 *.log
 crash-*.json
 android/google-services.json
+CLAUDE.md
