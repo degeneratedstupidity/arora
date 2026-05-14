@@ -1,0 +1,101 @@
+name: arora
+description: >
+  Arora — A free, open-source, cross-platform music player powered by YouTube Music.
+  Built with Flutter for Android, iOS, Linux, macOS, Windows, and Web.
+version: 1.1.0+2
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+# ---------------------------------------------------------------------------
+# Runtime Dependencies
+# ---------------------------------------------------------------------------
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── State Management ──────────────────────────────────────────────────────
+  flutter_riverpod: ^3.3.1       # Reactive state management + DI container
+  riverpod_annotation: ^4.0.2    # Code-gen annotations (@riverpod)
+
+  # ── Audio Engine ──────────────────────────────────────────────────────────
+  just_audio: ^0.9.43            # Cross-platform audio playback
+  audio_service: ^0.18.15        # Background audio + lock screen / notification controls
+
+  # ── YouTube Data Provider ─────────────────────────────────────────────────
+  # Extracts audio & video streams + metadata from YouTube.
+  # No API key required — uses reverse-engineered internal YouTube APIs.
+  # See: lib/infrastructure/youtube/youtube_explode_music_provider.dart
+  youtube_explode_dart: ^3.1.0
+
+  # ── Video Playback (Music Video Mode) ────────────────────────────────────
+  video_player: ^2.9.2           # Flutter official video player plugin
+  chewie: ^1.8.5                 # Rich UI wrapper around video_player
+
+  # ── Local Database ────────────────────────────────────────────────────────
+  # Switched from Isar → Hive CE: isar_generator 3.x caps analyzer at <6.0.0
+  # which conflicts with freezed >=2.5.3 and riverpod_generator >=2.4.2.
+  # Hive CE uses source_gen ^2.0.0 — fully compatible with all modern packages.
+  hive_ce: ^2.10.1               # Hive Community Edition — fast key-value NoSQL store
+  path_provider: ^2.1.5          # Platform-specific file paths for downloads + Hive dir
+
+  # ── Authentication ───────────────────────────────────────────────────────
+  google_sign_in: ^6.2.0         # Google OAuth 2.0 — eliminates YouTube rate limiting
+  extension_google_sign_in_as_googleapis_auth: ^2.0.0  # Converts GoogleSignIn token → authenticated http.Client
+
+  # ── Networking ────────────────────────────────────────────────────────────
+  dio: ^5.7.0                    # HTTP client (reserved for Phase 2 fallback providers)
+
+  # ── Configuration ─────────────────────────────────────────────────────────
+  flutter_dotenv: ^5.2.1         # Loads .env file at runtime (secrets management)
+
+  # ── Navigation ────────────────────────────────────────────────────────────
+  go_router: ^14.6.2             # Declarative, URL-based routing for all platforms
+
+  # ── UI / Media ────────────────────────────────────────────────────────────
+  cached_network_image: ^3.4.1   # Efficient album art + thumbnail loading & caching
+  google_fonts: ^6.2.1           # Inter / Outfit typefaces
+  window_manager: ^0.4.3         # Desktop: frameless window + custom title bar
+  file_picker: ^8.1.0            # Theme import — file dialog on Linux + Android
+
+  # ── Data Classes ──────────────────────────────────────────────────────────
+  freezed_annotation: ^3.1.0     # Immutable entity/model code-gen annotations
+  json_annotation: ^4.9.0        # JSON serialization annotations
+  system_tray: ^0.1.1
+  just_audio_media_kit: ^2.1.0
+  media_kit: ^1.2.6
+  media_kit_libs_audio: ^1.0.7
+  http: ^1.6.0
+
+# ---------------------------------------------------------------------------
+# Development Dependencies
+# ---------------------------------------------------------------------------
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code generation
+  build_runner: ^2.15.0          # Build system for all code-gen packages
+  riverpod_generator: ^4.0.3     # Generates Riverpod providers from @riverpod annotations
+  freezed: ^3.2.5                # Generates immutable value classes + unions
+  json_serializable: ^6.11.4      # Generates fromJson/toJson for DTO models
+  hive_ce_generator: ^1.9.2      # Generates Hive TypeAdapters for SongModel + PlaylistModel
+
+  # Testing
+  mocktail: ^1.0.4               # Type-safe mock library for unit tests
+
+  # Linting
+  flutter_lints: ^4.0.0          # Flutter recommended lint rules (extended in analysis_options.yaml)
+
+# ---------------------------------------------------------------------------
+# Flutter Configuration
+# ---------------------------------------------------------------------------
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env                             # Loaded by flutter_dotenv at startup
+    - assets/icons/
+
+

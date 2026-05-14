@@ -1,0 +1,156 @@
+# ===========================================================================
+# Arora — .gitignore
+# Generated for Flutter / Dart projects targeting all platforms.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# SECRETS — NEVER COMMIT THESE
+# ---------------------------------------------------------------------------
+*.env.local
+android/app/google-services.json
+ios/GoogleService-Info.plist
+*.env.*.local
+android/key.properties
+arora-release-key.jks
+*.AppImage
+
+# ---------------------------------------------------------------------------
+# Flutter / Dart build artifacts
+# ---------------------------------------------------------------------------
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock        # Commit this for apps (remove line if you prefer to commit it)
+
+# ---------------------------------------------------------------------------
+# Dart code generation (generated files)
+# Uncomment the lines below if you prefer NOT to commit generated files.
+# Most Flutter teams commit *.g.dart and *.freezed.dart for CI simplicity.
+# ---------------------------------------------------------------------------
+# *.g.dart
+# *.freezed.dart
+
+# ---------------------------------------------------------------------------
+# Isar local database (user data — never commit)
+# ---------------------------------------------------------------------------
+*.isar
+*.isar.lock
+
+# ---------------------------------------------------------------------------
+# Downloads directory (user-downloaded audio files)
+# ---------------------------------------------------------------------------
+/arora_downloads/
+
+# ---------------------------------------------------------------------------
+# IDE: Visual Studio Code
+# ---------------------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json   # Keep recommended extensions list for contributors
+
+# ---------------------------------------------------------------------------
+# IDE: Android Studio / IntelliJ IDEA
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.gradle/
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+android/local.properties
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/captures/
+android/generated_icons/
+
+# ---------------------------------------------------------------------------
+# iOS / macOS (Xcode)
+# ---------------------------------------------------------------------------
+ios/.symlinks/
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/Podfile.lock
+macos/.symlinks/
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Podfile.lock
+*.xcworkspace/xcuserdata
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserstate
+
+# ---------------------------------------------------------------------------
+# Linux
+# ---------------------------------------------------------------------------
+linux/flutter/ephemeral/
+
+# ---------------------------------------------------------------------------
+# Windows
+# ---------------------------------------------------------------------------
+windows/flutter/ephemeral/
+
+# ---------------------------------------------------------------------------
+# Web
+# ---------------------------------------------------------------------------
+web/flutter_service_worker.js
+web/.dart_tool/
+
+# ---------------------------------------------------------------------------
+# macOS system
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ---------------------------------------------------------------------------
+# Windows system
+# ---------------------------------------------------------------------------
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+
+# ---------------------------------------------------------------------------
+# Linux system
+# ---------------------------------------------------------------------------
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ---------------------------------------------------------------------------
+# Local debug / scratch files
+# ---------------------------------------------------------------------------
+test_yt.dart
+
+# ---------------------------------------------------------------------------
+# Test coverage
+# ---------------------------------------------------------------------------
+coverage/
+*.lcov
+
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
+*.log
+crash-*.json
+android/google-services.json
+CLAUDE.md

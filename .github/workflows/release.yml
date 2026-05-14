@@ -1,0 +1,232 @@
+name: Release
+
+# Triggered by pushing a version tag: git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Needed to create the GitHub Release and upload assets
+permissions:
+  contents: write
+
+jobs:
+  # ── Android APK ────────────────────────────────────────────────────────────
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # Inject secrets — both files are gitignored
+      - name: Write google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode release keystore
+        run: echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 --decode > arora-release-key.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=../../arora-release-key.jks
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
+
+  # ── Linux AppImage ─────────────────────────────────────────────────────────
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev libblkid-dev liblzma-dev \
+            libmpv-dev libfuse2 libappindicator3-dev
+
+      - name: Enable Linux desktop target
+        run: flutter config --enable-linux-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      - name: Download appimagetool
+        run: |
+          wget -q -O /tmp/appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+
+      - name: Build AppImage
+        run: |
+          BUNDLE="build/linux/x64/release/bundle"
+          APPDIR="/tmp/AroraAppDir"
+          mkdir -p "$APPDIR/usr/bin"
+
+          cp -r "$BUNDLE"/. "$APPDIR/usr/bin/"
+          cp assets/icons/arora.png "$APPDIR/arora.png"
+
+          cat > "$APPDIR/arora.desktop" <<'DESKTOP'
+          [Desktop Entry]
+          Name=Arora
+          Exec=arora
+          Icon=arora
+          Type=Application
+          Categories=AudioVideo;Music;Player;
+          Comment=A free, open-source music player powered by YouTube
+          DESKTOP
+
+          cat > "$APPDIR/AppRun" <<'APPRUN'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "$HERE/usr/bin/arora" "$@"
+          APPRUN
+          chmod +x "$APPDIR/AppRun"
+
+          ARCH=x86_64 /tmp/appimagetool "$APPDIR" arora-linux-x86_64.AppImage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: arora-linux-x86_64.AppImage
+          retention-days: 1
+
+  # ── Windows Executable ─────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable Windows desktop target
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Archive Windows Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: build\windows\x64\runner\Release
+          retention-days: 1
+
+  # ── GitHub Release ─────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [build-android, build-linux, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+
+      - name: Download Linux AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+
+      - name: Download Windows Executable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-executable
+          path: windows-release
+
+      - name: Rename assets with version tag
+        run: |
+          mv app-release.apk arora-${{ github.ref_name }}-android.apk
+          mv arora-linux-x86_64.AppImage arora-${{ github.ref_name }}-linux-x86_64.AppImage
+          cd windows-release
+          zip -r ../arora-${{ github.ref_name }}-windows.zip ./*
+          cd ..
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Arora ${{ github.ref_name }}
+          body: |
+            ## Installation
+
+            ### Android
+            Download `arora-${{ github.ref_name }}-android.apk` and sideload it:
+            1. Enable **Install unknown apps** for your file manager in Android Settings
+            2. Open the APK and tap Install
+
+            ### Linux
+            Download `arora-${{ github.ref_name }}-linux-x86_64.AppImage`, then:
+            ```bash
+            # One-time: make executable + install audio backend
+            chmod +x arora-${{ github.ref_name }}-linux-x86_64.AppImage
+            sudo pacman -S mpv          # Arch / Manjaro
+            sudo apt install libmpv-dev # Ubuntu / Debian
+
+            # Run
+            ./arora-${{ github.ref_name }}-linux-x86_64.AppImage
+            ```
+
+            ### Windows
+            Download and extract `arora-${{ github.ref_name }}-windows.zip`, then run `arora.exe`.
+          files: |
+            arora-${{ github.ref_name }}-android.apk
+            arora-${{ github.ref_name }}-linux-x86_64.AppImage
+            arora-${{ github.ref_name }}-windows.zip
+          generate_release_notes: true
