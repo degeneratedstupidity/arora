@@ -6,10 +6,10 @@
 # ---------------------------------------------------------------------------
 # SECRETS — NEVER COMMIT THESE
 # ---------------------------------------------------------------------------
-*.env.local
+.env
+.env.*
 android/app/google-services.json
 ios/GoogleService-Info.plist
-*.env.*.local
 android/key.properties
 arora-release-key.jks
 *.AppImage
@@ -140,6 +140,8 @@ Desktop.ini
 # Local debug / scratch files
 # ---------------------------------------------------------------------------
 test_yt.dart
+test_output.txt
+test_playlist.dart
 
 # ---------------------------------------------------------------------------
 # Test coverage
@@ -148,9 +150,15 @@ coverage/
 *.lcov
 
 # ---------------------------------------------------------------------------
+# Project docs (local development only)
+# ---------------------------------------------------------------------------
+.metadata
+IMPLEMENTATION_PLAN.md
+PROJECT_OVERVIEW.md
+
+# ---------------------------------------------------------------------------
 # Logs
 # ---------------------------------------------------------------------------
 *.log
 crash-*.json
 android/google-services.json
-CLAUDE.md

@@ -6,7 +6,6 @@
   <p>
     <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
     <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Linux%20%7C%20Windows-6C63FF?style=for-the-badge" alt="Platforms">
-    <img src="https://img.shields.io/github/v/release/degeneratedstupidity/arora?style=for-the-badge&label=Latest&color=22c55e" alt="Release">
     <img src="https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge" alt="License">
   </p>
 
