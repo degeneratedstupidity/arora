@@ -106,7 +106,7 @@ All requests share the same InnerTube context payload:
 | Step 7 — Remove rate-limit workarounds | ⏳ Pending | Optional — workarounds are harmless; removing them would only matter if auth was actually reducing request volume (it currently isn't, since the client isn't injected) |
 | Step 8 — Android Cloud Console + Firebase setup | ✅ Done | SHA-1 added, `google-services.json` in `android/app/`, Gradle 8.13, JDK 21 (Android Studio bundled) |
 | Step 9 — audio_service Android fix | ✅ Done | `MainActivity` → `AudioServiceActivity`; service + receiver in `AndroidManifest.xml` |
-| Step 10 — OAuth test user whitelist | ✅ Done | `celeticcharger@gmail.com` added to Cloud Console Test users |
+| Step 10 — OAuth test user whitelist | ✅ Done | Owner's Google account added to Cloud Console Test users |
 | End-to-end Android test | ✅ Confirmed | Audio (muxed mp4), search, auto-advance, Google Sign-In — all working on vivo 1920 |
 | Lock screen / notification controls | ✅ Fixed (Session 7) | `aroraAudioHandler` global singleton wired via `connect()` callbacks; `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permissions added; confirmed on vivo 1920 |
 | Smart Shuffle algorithm | ✅ Improved (Session 7) | Threshold 3, batch 15, `_recentSeeds` tracking, fallback different-artist seed; confirmed on vivo 1920 |

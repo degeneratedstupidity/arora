@@ -276,7 +276,7 @@ Generated files (do not edit manually): `*.freezed.dart`, `*.g.dart`
 - All features confirmed working on **Linux and Android** (vivo 1920) as of May 2026, including lock screen controls and notification player
 - **Stream type:** `manifest.muxed` (itag=18, video/mp4 96 kbps AAC). YouTube's CDN blocks audio-only opus/webm streams (itag=251) for external players (mpv, ExoPlayer) that lack YouTube session cookies. Muxed mp4 streams are freely accessible; just_audio/mpv/ExoPlayer extract the audio track automatically.
 - **Phase 1 OAuth implementation complete** — `YoutubeAuthService` / `_GoogleAccountTile` in Settings. The authenticated http.Client is **not** passed into `YoutubeExplode` (doing so caused 403s — the library's own cookie-based session is the correct credential mechanism). OAuth is useful for personal library access on Android; playback, search, and recommendations work without it.
-- Android Cloud Console: Firebase project `arora-495906`, SHA-1 fingerprint registered, `google-services.json` in `android/app/`. Test user `celeticcharger@gmail.com` whitelisted.
+- Android Cloud Console: Firebase project configured, SHA-1 fingerprint registered, `google-services.json` in `android/app/` (gitignored — inject via CI secret).
 
 ### Rate limiting mitigation
 `youtube_explode_dart` uses YouTube's internal API without authentication; YouTube enforces per-IP rate limits. The following design decisions keep request volume within safe bounds:
