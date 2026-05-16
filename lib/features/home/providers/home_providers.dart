@@ -9,14 +9,18 @@ final trendingProvider = FutureProvider<List<Song>>((ref) async {
   return provider.getTrending(limit: 20);
 });
 
-/// Genre labels and their corresponding search queries shown on the Home screen.
+/// Genre labels and base search queries shown on the Home screen.
+///
+/// Queries intentionally omit a year — the year is appended at fetch time
+/// inside [genreSongsProvider] so YouTube surfaces current-year releases
+/// rather than results pinned to a stale year string.
 const homeGenres = <({String label, String query})>[
-  (label: 'Pop Hits', query: 'top pop hits 2024'),
-  (label: 'Hip-Hop', query: 'top hip hop rap songs 2024'),
-  (label: 'Electronic', query: 'electronic dance music hits'),
+  (label: 'Pop Hits', query: 'top pop hits'),
+  (label: 'Hip-Hop', query: 'best hip hop rap songs'),
+  (label: 'Electronic', query: 'electronic dance music'),
 ];
 
-/// Songs for a specific genre (keyed by query string).
+/// Songs for a specific genre (keyed by the base query string).
 ///
 /// Loads after trending completes and staggers each genre 1.5s apart so that
 /// all four home-screen requests never hit YouTube simultaneously — avoiding
@@ -39,6 +43,16 @@ final genreSongsProvider =
   }
 
   final provider = ref.watch(musicProviderProvider);
+  final year = DateTime.now().year;
+
+  // Append current year so YouTube surfaces recent releases.
+  // Fall back to the base query if the year-tagged search returns nothing
+  // (can happen when YouTube returns non-standard result types that
+  // youtube_explode_dart can't parse).
+  final yearTaggedQuery = '$query $year';
+  final songs = await provider.searchSongs(yearTaggedQuery, limit: 15);
+  if (songs.isNotEmpty) return songs;
+
   return provider.searchSongs(query, limit: 15);
 });
 

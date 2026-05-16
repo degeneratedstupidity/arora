@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:arora/core/theme/app_colors.dart';
+import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/domain/entities/lyrics.dart';
 import 'package:arora/domain/usecases/get_lyrics_usecase.dart';
 import 'package:arora/features/player/providers/player_providers.dart';
@@ -44,7 +44,11 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
     final position = ref.watch(playbackPositionProvider).value;
 
     return lyricsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => Center(
+        child: CircularProgressIndicator(
+          color: Theme.of(context).extension<AroraTheme>()!.colors(context).accent,
+        ),
+      ),
       error: (_, __) => const _NoLyricsState(),
       data: (lyrics) {
         if (lyrics == null || !lyrics.hasContent) return const _NoLyricsState();
@@ -78,7 +82,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
           child: Text(
             lyrics.plainText ?? '',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondaryDark,
+                  color: Theme.of(context).extension<AroraTheme>()!.colors(context).textSecondary,
                   height: 1.8,
                 ),
           ),
@@ -95,16 +99,17 @@ class _LyricLineWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AroraTheme>()!.colors(context);
     return AnimatedDefaultTextStyle(
       duration: const Duration(milliseconds: 200),
       style: isActive
           ? Theme.of(context).textTheme.titleMedium!.copyWith(
-                color: AppColors.primary,
+                color: c.accent,
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
               )
           : Theme.of(context).textTheme.bodyLarge!.copyWith(
-                color: AppColors.textSecondaryDark.withAlpha(180),
+                color: c.textSecondary.withAlpha(180),
               ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -117,15 +122,20 @@ class _LyricLineWidget extends StatelessWidget {
 class _NoLyricsState extends StatelessWidget {
   const _NoLyricsState();
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lyrics_outlined, size: 48, color: AppColors.textSecondaryDark),
-            const SizedBox(height: 12),
-            Text('No lyrics available',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondaryDark),),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AroraTheme>()!.colors(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lyrics_outlined, size: 48, color: c.textSecondary),
+          const SizedBox(height: 12),
+          Text(
+            'No lyrics available',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
 }

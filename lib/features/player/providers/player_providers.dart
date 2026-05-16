@@ -128,8 +128,8 @@ class IsShuffleNotifier extends Notifier<bool> {
 // Player mode (audio vs. video toggle)
 // ---------------------------------------------------------------------------
 
-/// Tracks whether the Now Playing screen is in audio or video mode.
-enum PlayerMode { audio, video }
+/// Tracks the active view in the Now Playing screen.
+enum PlayerMode { audio, video, lyrics, visualizer }
 
 final playerModeProvider =
     NotifierProvider<PlayerModeNotifier, PlayerMode>(PlayerModeNotifier.new);

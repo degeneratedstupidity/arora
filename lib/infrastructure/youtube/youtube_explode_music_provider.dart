@@ -9,31 +9,10 @@ import 'package:arora/domain/providers/music_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
-/// {@template youtube_explode_music_provider}
-/// A fully implemented [MusicProvider] powered by `youtube_explode_dart`.
-///
-/// ## How it works (no API key required)
-/// Uses `youtube_explode_dart` which reverse-engineers YouTube's internal API
-/// — the same technique as yt-dlp. No quotas, no key needed, all platforms.
-///
-/// ## Music Video Strategy (Phase 2: Option A — HLS muxed)
-/// Music video URLs are resolved via HLS (m3u8) muxed streams which contain
-/// both audio and video in a single URL. This works out-of-the-box with
-/// `chewie` / `video_player` on all platforms. Max quality is ~360p due to
-/// YouTube's muxed stream limitation. HD video (Option B) is a Phase 3 goal.
-///
-/// ## Error handling
-/// All `youtube_explode_dart` exceptions are caught and converted to typed
-/// [AroraException] subclasses so the UI layer never sees raw yt errors.
-/// {@endtemplate}
 class YoutubeExplodeMusicProvider extends MusicProvider {
-  /// [httpClient] — optional authenticated http.Client from [YoutubeAuthService].
-  /// When provided, all YouTube requests carry valid OAuth tokens, eliminating
-  /// IP-based rate limiting. Falls back to unauthenticated (guest) mode when null.
-  // The authenticated http.Client carries googleapis OAuth headers that
-  // InnerTube's player endpoint rejects with 403. YoutubeExplode gets a plain
-  // unauthenticated client. Phase 2 (direct InnerTube calls) will use the
-  // authenticated client directly without going through youtube_explode_dart.
+  // Authenticated http.Client (googleapis OAuth) is intentionally NOT passed to
+  // YoutubeExplode — its headers cause 403 on player endpoints. The library uses
+  // its own cookie session which is the correct credential for stream URLs.
   YoutubeExplodeMusicProvider([http.Client? httpClient])
       : _yt = yt.YoutubeExplode();
 
@@ -70,17 +49,27 @@ class YoutubeExplodeMusicProvider extends MusicProvider {
     try {
       _log.debug('searchSongs: "$query" (limit=$limit, page=$page)');
 
-      // youtube_explode_dart search returns a lazily-paginated SearchList.
-      // We collect [limit] items, skipping [page * limit] for pagination.
-      final searchList = await _yt.search.search(query);
+      // 8-second cap: YouTube rate-limit redirects can stall for 12-13 s
+      // before throwing ClientException. Timing out early lets the caller
+      // gracefully skip this request instead of blocking the queue refill.
+      final searchList = await _yt.search
+          .search(query)
+          .timeout(const Duration(seconds: 8));
 
-      // TODO: Implement proper page-based cursor navigation using
-      // searchList.nextPage() for page > 0.
-      final songs = searchList
-          .whereType<yt.Video>()
-          .take(limit)
-          .map(_videoToSong)
-          .toList();
+      // Iterate with per-item error handling: youtube_explode_dart parses
+      // each SearchResult lazily. Some result types (YouTube Music charts,
+      // Shorts, etc.) have a different JSON schema that triggers
+      // NoSuchMethodError inside getT(). Catching per-item lets us skip
+      // those cards and still return the valid Video results around them.
+      final songs = <Song>[];
+      for (final result in searchList) {
+        if (songs.length >= limit) break;
+        try {
+          songs.add(_videoToSong(result));
+        } catch (_) {
+          continue;
+        }
+      }
 
       _log.info('searchSongs: found ${songs.length} results for "$query"');
       return songs;
@@ -88,8 +77,8 @@ class YoutubeExplodeMusicProvider extends MusicProvider {
       _log.error('searchSongs failed', error: e);
       throw NetworkException('YouTube search failed: ${e.message}');
     } catch (e) {
-      _log.error('searchSongs unexpected error', error: e);
-      throw ParseException('Failed to parse search results: $e');
+      _log.warn('searchSongs: parse error for "$query"', error: e);
+      return [];
     }
   }
 
@@ -357,30 +346,39 @@ class YoutubeExplodeMusicProvider extends MusicProvider {
     String songId, {
     int limit = 20,
     String? artistHint,
+    bool useSearchFallback = true,
   }) async {
     try {
       _log.debug('getRecommendations: seed=$songId limit=$limit');
 
-      // YouTube auto-generates a "Radio Mix" playlist for every video using
-      // the ID format RD{videoId}. This is far more reliable than
-      // getRelatedVideos(), which returns null for most videos.
-      final mixPlaylistId = 'RD$songId';
-      final videos = await _yt.playlists
-          .getVideos(mixPlaylistId)
-          .where((v) => v.id.value != songId)
-          .take(limit)
-          .toList();
-
-      if (videos.isNotEmpty) {
-        final songs = videos.map(_videoToSong).toList();
-        _log.info('getRecommendations: ${songs.length} songs via Radio Mix');
-        return songs;
+      // SimpMusic uses RDAMVM (YouTube Music InnerTube auto-mix format) as the
+      // primary radio prefix — it returns genre-aware results across different
+      // artists. The legacy RD prefix is always empty when RDAMVM is empty
+      // (same underlying playlist data), so we skip it to save one API call.
+      try {
+        final videos = await _yt.playlists
+            .getVideos('RDAMVM$songId')
+            .where((v) => v.id.value != songId)
+            .take(limit)
+            .toList();
+        if (videos.isNotEmpty) {
+          _log.info(
+            'getRecommendations: ${videos.length} songs via RDAMVM Radio Mix',
+          );
+          return videos.map(_videoToSong).toList();
+        }
+        _log.debug('getRecommendations: RDAMVM Radio Mix empty');
+      } catch (_) {
+        _log.debug('getRecommendations: RDAMVM fetch failed');
       }
 
-      // Fallback: search by artist name. Use the hint from the caller if
-      // available — avoids an extra _yt.videos.get() request for metadata
-      // we already have, which can trigger YouTube rate limiting.
-      _log.debug('getRecommendations: Radio Mix empty, falling back to artist search');
+      // Artist-search fallback uses the search API (rate-limited). Skip when
+      // the caller handles variety itself (e.g. SmartShuffleService genre search).
+      if (!useSearchFallback) {
+        _log.debug('getRecommendations: RDAMVM empty, search fallback disabled');
+        return [];
+      }
+      _log.debug('getRecommendations: all Radio Mix formats empty, falling back to artist search');
       final String artist;
       if (artistHint != null && artistHint.isNotEmpty) {
         artist = artistHint;
@@ -392,7 +390,9 @@ class YoutubeExplodeMusicProvider extends MusicProvider {
       final results = await searchSongs('$artist music', limit: limit + 1);
       final filtered =
           results.where((s) => s.id != songId).take(limit).toList();
-      _log.info('getRecommendations: ${filtered.length} songs via artist search fallback');
+      _log.info(
+        'getRecommendations: ${filtered.length} songs via artist search fallback',
+      );
       return filtered;
     } on yt.YoutubeExplodeException catch (e) {
       _log.warn('getRecommendations failed for $songId', error: e);
@@ -411,26 +411,30 @@ class YoutubeExplodeMusicProvider extends MusicProvider {
     try {
       _log.debug('getTrending: countryCode=$countryCode limit=$limit');
 
-      // YouTube Music trending playlist ID (global).
-      // This is YouTube Music's official "Top Songs" chart playlist.
-      const trendingPlaylistId = 'PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI';
+      // Use a date-tagged search so results reflect what YouTube's algorithm
+      // considers popular right now — changes monthly, unlike a static playlist.
+      final now = DateTime.now();
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+      ];
+      final query =
+          'trending music ${monthNames[now.month - 1]} ${now.year}';
 
-      final videos = await _yt.playlists
-          .getVideos(trendingPlaylistId)
-          .take(limit)
-          .toList();
-
-      final songs = videos.map(_videoToSong).toList();
-      _log.info('getTrending: returned ${songs.length} songs');
-      return songs;
-    } on yt.YoutubeExplodeException catch (e) {
-      _log.warn('getTrending failed, falling back to search', error: e);
-      // Fallback: search for "top hits" if playlist fails
-      try {
-        return searchSongs('top hits 2024 music', limit: limit);
-      } catch (_) {
-        return [];
+      final songs = await searchSongs(query, limit: limit);
+      if (songs.isNotEmpty) {
+        _log.info('getTrending: ${songs.length} songs via "$query"');
+        return songs;
       }
+
+      // Fallback: broader search if the dated query returns nothing.
+      final fallback =
+          await searchSongs('top hits ${now.year} music', limit: limit);
+      _log.info('getTrending: ${fallback.length} songs via fallback search');
+      return fallback;
+    } catch (e) {
+      _log.warn('getTrending failed', error: e);
+      return [];
     }
   }
 

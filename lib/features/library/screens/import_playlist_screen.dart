@@ -51,6 +51,9 @@ class _ImportPlaylistScreenState extends ConsumerState<ImportPlaylistScreen> {
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(64, 40),
+                  ),
                   onPressed: () {
                     FocusScope.of(context).unfocus();
                     ref

@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:arora/core/theme/app_spacing.dart';
 import 'package:arora/core/theme/arora_theme.dart';
 import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/features/search/providers/search_history_notifier.dart';
 import 'package:arora/features/search/providers/search_providers.dart';
 import 'package:arora/shared/widgets/album_card.dart';
+import 'package:arora/shared/widgets/arora_image.dart';
 import 'package:arora/shared/widgets/error_view.dart';
 import 'package:arora/shared/widgets/loading_indicator.dart';
 import 'package:arora/shared/widgets/song_tile.dart';
+
+// Colorful genre grid matching Echo's palette
+const _genres = <({String label, Color color})>[
+  (label: 'Electronic', color: Color(0xFF2D1B6E)),
+  (label: 'Pop', color: Color(0xFF6E1B3D)),
+  (label: 'Indie', color: Color(0xFF1B4E6E)),
+  (label: 'Jazz', color: Color(0xFF1B6E3D)),
+  (label: 'Rock', color: Color(0xFF6E3D1B)),
+  (label: 'Hip-Hop', color: Color(0xFF3D1B6E)),
+];
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -35,15 +47,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (q.isEmpty) return;
     try {
       ref.read(searchHistoryProvider.notifier).add(q);
-    } catch (_) {
-      // History save is non-critical — never block playback.
-    }
+    } catch (_) {}
   }
 
   void _applyHistoryItem(String query) {
     _controller.text = query;
     _onQueryChanged(query);
     ref.read(searchHistoryProvider.notifier).add(query);
+  }
+
+  void _applyGenre(String genre) {
+    _controller.text = genre;
+    _onQueryChanged(genre);
+    ref.read(searchHistoryProvider.notifier).add(genre);
   }
 
   @override
@@ -86,7 +102,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
       ),
       body: query.trim().isEmpty
-          ? _SearchHistoryView(onTap: _applyHistoryItem)
+          ? _SearchEmptyView(
+              onHistoryTap: _applyHistoryItem,
+              onGenreTap: _applyGenre,
+            )
           : CustomScrollView(
               slivers: [
                 // ── Song results ──────────────────────────────────────────
@@ -168,9 +187,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _SearchHistoryView extends ConsumerWidget {
-  const _SearchHistoryView({required this.onTap});
-  final void Function(String query) onTap;
+// ── Empty state: history chips + genre grid ───────────────────────────────────
+
+class _SearchEmptyView extends ConsumerWidget {
+  const _SearchEmptyView({
+    required this.onHistoryTap,
+    required this.onGenreTap,
+  });
+  final void Function(String) onHistoryTap;
+  final void Function(String) onGenreTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -178,72 +203,210 @@ class _SearchHistoryView extends ConsumerWidget {
     final theme = Theme.of(context);
     final c = theme.extension<AroraTheme>()!.colors(context);
 
-    if (history.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_rounded, size: 64, color: c.textSecondary),
-            const SizedBox(height: 16),
-            Text(
-              'Search for any song, artist, or album',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: c.textSecondary,
+    return CustomScrollView(
+      slivers: [
+        // ── Recent searches (pill chips) ──────────────────────────────────
+        if (history.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Recent searches',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        ref.read(searchHistoryProvider.notifier).clear(),
+                    child: const Text('Clear all'),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
-    }
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: history
+                    .map(
+                      (query) => _HistoryChip(
+                        query: query,
+                        onTap: () => onHistoryTap(query),
+                        onRemove: () =>
+                            ref.read(searchHistoryProvider.notifier).remove(query),
+                        colors: c,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        ],
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Recent searches',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: c.textSecondary,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () =>
-                    ref.read(searchHistoryProvider.notifier).clear(),
-                child: const Text('Clear all'),
-              ),
-            ],
+        // ── Genre grid ────────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: Text(
+              'Browse genres',
+              style: theme.textTheme.titleMedium,
+            ),
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: history.length,
-            itemBuilder: (context, i) {
-              final query = history[i];
-              return ListTile(
-                leading: Icon(
-                  Icons.history_rounded,
-                  color: c.textSecondary,
-                ),
-                title: Text(query, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  onPressed: () =>
-                      ref.read(searchHistoryProvider.notifier).remove(query),
-                ),
-                onTap: () => onTap(query),
-              );
-            },
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 1.6,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, i) => _GenreTile(
+                genre: _genres[i],
+                onTap: () => onGenreTap(_genres[i].label),
+              ),
+              childCount: _genres.length,
+            ),
           ),
         ),
       ],
     );
   }
 }
+
+// ── Pill-shaped history chip ──────────────────────────────────────────────────
+
+class _HistoryChip extends StatelessWidget {
+  const _HistoryChip({
+    required this.query,
+    required this.onTap,
+    required this.onRemove,
+    required this.colors,
+  });
+  final String query;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+  final AroraColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.only(left: 14, right: 4, top: 8, bottom: 8),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: colors.surfaceHighest, width: 0.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_rounded, size: 14, color: colors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              query,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: colors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onRemove,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: colors.textTertiary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Genre tile ────────────────────────────────────────────────────────────────
+
+class _GenreTile extends ConsumerWidget {
+  const _GenreTile({required this.genre, required this.onTap});
+  final ({String label, Color color}) genre;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailUrl =
+        ref.watch(genreThumbnailProvider(genre.label)).asData?.value;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Solid color: shown while thumbnail loads and as composite base.
+            ColoredBox(color: genre.color),
+            // Thumbnail image fades in once the provider resolves.
+            if (thumbnailUrl != null) AroraImage(imageUrl: thumbnailUrl),
+            // Gradient overlay so the label stays legible over any thumbnail.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    genre.color.withAlpha(220),
+                    genre.color.withAlpha(80),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -16,
+              right: -16,
+              child: Icon(
+                Icons.music_note_rounded,
+                size: 96,
+                color: Colors.white.withAlpha(28),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                genre.label,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── No results ────────────────────────────────────────────────────────────────
 
 class _NoResults extends StatelessWidget {
   const _NoResults({required this.label});

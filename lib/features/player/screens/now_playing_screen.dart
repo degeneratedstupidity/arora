@@ -18,18 +18,14 @@ import 'package:arora/features/player/providers/player_providers.dart';
 import 'package:arora/features/player/screens/lyrics_screen.dart';
 import 'package:arora/features/player/widgets/player_controls.dart';
 import 'package:arora/shared/widgets/arora_image.dart';
+import 'package:arora/shared/widgets/audio_visualizer.dart';
 import 'package:arora/shared/widgets/error_view.dart';
 import 'package:arora/shared/widgets/loading_indicator.dart';
 import 'package:arora/features/player/widgets/blurred_background.dart';
 import 'package:arora/shared/widgets/spring_button.dart';
 import 'package:arora/shared/utils/bottom_sheet_utils.dart';
+import 'package:arora/shared/widgets/like_button.dart';
 
-/// Full-screen Now Playing screen.
-///
-/// Gestures:
-///   Pull down (drag > 150 px or velocity > 600 px/s) → pop back to library.
-///   Swipe left on album art → skip next.
-///   Swipe right on album art → skip previous.
 class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
 
@@ -39,15 +35,16 @@ class NowPlayingScreen extends ConsumerStatefulWidget {
 
 class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
     with SingleTickerProviderStateMixin {
-  // ── Pull-to-dismiss ───────────────────────────────────────────────────────
+  // ── Pull-to-dismiss ───────────────────────────────────────────────────────────
   late final AnimationController _snapCtrl;
   double _dismissOffset = 0;
+
+  // ── Visualizer sub-mode ───────────────────────────────────────────────────────
+  VisualizerMode _visualizerMode = VisualizerMode.bars;
 
   @override
   void initState() {
     super.initState();
-    // Unbounded controller lets the spring settle to slightly negative
-    // values (tiny upward overshoot) for a physical feel.
     _snapCtrl = AnimationController.unbounded(vsync: this)
       ..addListener(() {
         if (mounted) setState(() => _dismissOffset = _snapCtrl.value);
@@ -62,7 +59,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
 
   void _onDragUpdate(DragUpdateDetails d) {
     _snapCtrl.stop();
-    // Resist upward drags — only let content move down.
     setState(() {
       _dismissOffset = (_dismissOffset + d.delta.dy).clamp(0.0, double.infinity);
     });
@@ -74,8 +70,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
       if (context.canPop()) { context.pop(); } else { context.go('/'); }
       return;
     }
-    // Velocity-aware spring snap-back: the release velocity feeds into the
-    // simulation so a gentle release feels gentle and a flick feels snappy.
     _snapCtrl.animateWith(
       SpringSimulation(AppMotion.swipeSpring, _dismissOffset, 0.0, velocity),
     );
@@ -98,18 +92,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
         final t = Theme.of(context).extension<AroraTheme>()!;
         final c = t.colors(context);
         final playerMode = ref.watch(playerModeProvider);
+        final isPlaying = ref.watch(isPlayingProvider).value ?? false;
         final screenHeight = MediaQuery.of(context).size.height;
 
-        // Opacity fades as content slides down (fully transparent at 300 px)
         final opacity = (1.0 - _dismissOffset / 300.0).clamp(0.0, 1.0);
-        // Subtle scale-down during dismiss
         final scale = (1.0 - _dismissOffset / (screenHeight * 5)).clamp(0.92, 1.0);
 
         return Scaffold(
           backgroundColor: Colors.transparent,
           body: GestureDetector(
-            // Only detect downward drags — nested scrollables (lyrics sheet)
-            // are not part of this screen so there is no conflict.
             onVerticalDragUpdate: _onDragUpdate,
             onVerticalDragEnd: _onDragEnd,
             child: Transform.translate(
@@ -120,10 +111,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
                   opacity: opacity,
                   child: Stack(
                     children: [
-                      // Blurred album art background
                       BlurredBackground(imageUrl: song.thumbnailUrl),
 
-                      // Content
                       SafeArea(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -144,25 +133,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
                             // ── Top bar ──────────────────────────────────────
                             _TopBar(song: song, colors: c),
 
-                            // ── Audio/Video mode toggle ───────────────────────
-                            if (song.hasVideo)
-                              _ModeToggle(
-                                playerMode: playerMode,
-                                colors: c,
-                                shapes: t.shapes,
-                                onAudio: () => ref
-                                    .read(playerModeProvider.notifier)
-                                    .update(PlayerMode.audio),
-                                onVideo: () => ref
-                                    .read(playerModeProvider.notifier)
-                                    .update(PlayerMode.video),
-                              ),
+                            // ── Mode tab bar (always visible) ─────────────────
+                            _FullModeToggle(
+                              playerMode: playerMode,
+                              hasvideo: song.hasVideo,
+                              colors: c,
+                              shapes: t.shapes,
+                              onMode: (mode) => ref
+                                  .read(playerModeProvider.notifier)
+                                  .update(mode),
+                            ),
 
-                            // ── Art / Video ───────────────────────────────────
+                            // ── Art / Video / Lyrics / Visualizer ─────────────
                             Expanded(
-                              child: playerMode == PlayerMode.video && song.hasVideo
-                                  ? _VideoView(songId: song.videoId ?? song.id)
-                                  : _SwipeableArtView(song: song, shapes: t.shapes),
+                              child: _ContentArea(
+                                song: song,
+                                playerMode: playerMode,
+                                shapes: t.shapes,
+                                isPlaying: isPlaying,
+                                visualizerMode: _visualizerMode,
+                                colors: c,
+                                onVisualizerModeChanged: (mode) =>
+                                    setState(() => _visualizerMode = mode),
+                              ),
                             ),
 
                             // ── Song info ─────────────────────────────────────
@@ -174,11 +167,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
                               child: PlayerControls(),
                             ),
 
-                            // ── Bottom row: Lyrics + Queue ────────────────────
+                            // ── Bottom row: Queue ─────────────────────────────
                             _BottomActions(
                               colors: c,
                               shapes: t.shapes,
-                              onLyrics: () => _showLyricsSheet(context, c),
                               onQueue: () => context.push('/queue'),
                             ),
 
@@ -196,48 +188,177 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen>
       },
     );
   }
+}
 
-  // ── Bottom sheets ─────────────────────────────────────────────────────────
+// ── Content area — switches between art, video, lyrics, visualizer ────────────
 
-  void _showLyricsSheet(BuildContext context, AroraColors c) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        return Container(
-          height: screenHeight * 0.7,
-          decoration: BoxDecoration(
-            color: c.surfaceRaised,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppSpacing.radiusLg),
+class _ContentArea extends ConsumerWidget {
+  const _ContentArea({
+    required this.song,
+    required this.playerMode,
+    required this.shapes,
+    required this.isPlaying,
+    required this.visualizerMode,
+    required this.colors,
+    required this.onVisualizerModeChanged,
+  });
+
+  final Song song;
+  final PlayerMode playerMode;
+  final AroraShapes shapes;
+  final bool isPlaying;
+  final VisualizerMode visualizerMode;
+  final AroraColors colors;
+  final void Function(VisualizerMode) onVisualizerModeChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    switch (playerMode) {
+      case PlayerMode.video when song.hasVideo:
+        return _VideoView(songId: song.videoId ?? song.id);
+
+      case PlayerMode.lyrics:
+        return _LyricsArea(colors: colors, shapes: shapes);
+
+      case PlayerMode.visualizer:
+        return _VisualizerArea(
+          isPlaying: isPlaying,
+          mode: visualizerMode,
+          colors: colors,
+          onModeChanged: onVisualizerModeChanged,
+        );
+
+      default:
+        return _SwipeableArtView(song: song, shapes: shapes);
+    }
+  }
+}
+
+// ── Lyrics inline area ────────────────────────────────────────────────────────
+
+class _LyricsArea extends StatelessWidget {
+  const _LyricsArea({required this.colors, required this.shapes});
+  final AroraColors colors;
+  final AroraShapes shapes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.sm,
+      ),
+      child: ClipRRect(
+        borderRadius: shapes.xl,
+        child: Container(
+          color: colors.surfaceRaised.withAlpha(120),
+          child: const LyricsView(),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Visualizer inline area ────────────────────────────────────────────────────
+
+class _VisualizerArea extends StatelessWidget {
+  const _VisualizerArea({
+    required this.isPlaying,
+    required this.mode,
+    required this.colors,
+    required this.onModeChanged,
+  });
+  final bool isPlaying;
+  final VisualizerMode mode;
+  final AroraColors colors;
+  final void Function(VisualizerMode) onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.sm,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: colors.surfaceRaised.withAlpha(100)),
+            AudioVisualizer(
+              isPlaying: isPlaying,
+              mode: mode,
+              color: colors.textPrimary,
             ),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: c.surfaceHighest,
-                  borderRadius: BorderRadius.circular(2),
+            // Sub-mode pills at bottom
+            Positioned(
+              bottom: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceRaised.withAlpha(200),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: VisualizerMode.values
+                        .map(
+                          (m) => _VisualizerPill(
+                            label: m.name.toUpperCase(),
+                            isSelected: m == mode,
+                            colors: colors,
+                            onTap: () => onModeChanged(m),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Lyrics',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: c.textPrimary),
-              ),
-              const Expanded(child: LyricsView()),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisualizerPill extends StatelessWidget {
+  const _VisualizerPill({
+    required this.label,
+    required this.isSelected,
+    required this.colors,
+    required this.onTap,
+  });
+  final String label;
+  final bool isSelected;
+  final AroraColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.medium,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.playButtonBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+            color: isSelected ? colors.playButtonFg : colors.textSecondary,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -292,7 +413,6 @@ class _TopBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Down-chevron — falls back to home if stack is empty.
           SpringButton(
             pressedScale: 0.85,
             onTap: () =>
@@ -322,7 +442,6 @@ class _TopBar extends ConsumerWidget {
             ),
           ),
 
-          // Options
           SpringButton(
             pressedScale: 0.85,
             onTap: () {
@@ -344,24 +463,37 @@ class _TopBar extends ConsumerWidget {
   }
 }
 
-// ── Mode toggle (Audio / Video) ───────────────────────────────────────────────
+// ── Full 4-mode toggle ────────────────────────────────────────────────────────
 
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({
+class _FullModeToggle extends StatelessWidget {
+  const _FullModeToggle({
     required this.playerMode,
+    required this.hasvideo,
     required this.colors,
     required this.shapes,
-    required this.onAudio,
-    required this.onVideo,
+    required this.onMode,
   });
   final PlayerMode playerMode;
+  final bool hasvideo;
   final AroraColors colors;
   final AroraShapes shapes;
-  final VoidCallback onAudio;
-  final VoidCallback onVideo;
+  final void Function(PlayerMode) onMode;
 
   @override
   Widget build(BuildContext context) {
+    // Always show Music + Lyrics + Visualizer; show Video only if available
+    final modes = <({PlayerMode mode, String label, IconData icon})>[
+      (mode: PlayerMode.audio, label: 'Music', icon: Icons.music_note_rounded),
+      if (hasvideo)
+        (mode: PlayerMode.video, label: 'Video', icon: Icons.videocam_rounded),
+      (mode: PlayerMode.lyrics, label: 'Lyrics', icon: Icons.lyrics_outlined),
+      (
+        mode: PlayerMode.visualizer,
+        label: 'Scene',
+        icon: Icons.bar_chart_rounded,
+      ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
@@ -374,24 +506,20 @@ class _ModeToggle extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            _ModeTab(
-              label: 'Audio',
-              icon: Icons.music_note_rounded,
-              isSelected: playerMode == PlayerMode.audio,
-              colors: colors,
-              shapes: shapes,
-              onTap: onAudio,
-            ),
-            _ModeTab(
-              label: 'Video',
-              icon: Icons.videocam_rounded,
-              isSelected: playerMode == PlayerMode.video,
-              colors: colors,
-              shapes: shapes,
-              onTap: onVideo,
-            ),
-          ],
+          children: modes
+              .map(
+                (m) => Flexible(
+                  child: _ModeTab(
+                    label: m.label,
+                    icon: m.icon,
+                    isSelected: playerMode == m.mode,
+                    colors: colors,
+                    shapes: shapes,
+                    onTap: () => onMode(m.mode),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ),
     );
@@ -422,7 +550,7 @@ class _ModeTab extends StatelessWidget {
         duration: AppMotion.medium,
         curve: AppMotion.standard,
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
+          horizontal: AppSpacing.sm,
           vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
@@ -433,17 +561,18 @@ class _ModeTab extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              size: 14,
+              size: 13,
               color: isSelected ? colors.textPrimary : colors.textTertiary,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight:
                     isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected ? colors.textPrimary : colors.textTertiary,
@@ -458,10 +587,6 @@ class _ModeTab extends StatelessWidget {
 
 // ── Swipeable album art ───────────────────────────────────────────────────────
 
-/// Album art that responds to horizontal swipe gestures.
-///
-/// Swipe left → skip next, swipe right → skip previous.
-/// On gesture end the art spring-snaps back to center.
 class _SwipeableArtView extends ConsumerStatefulWidget {
   const _SwipeableArtView({required this.song, required this.shapes});
   final Song song;
@@ -519,7 +644,6 @@ class _SwipeableArtViewState extends ConsumerState<_SwipeableArtView>
       return;
     }
 
-    // Velocity-aware spring: release velocity feeds into simulation.
     _snapCtrl.animateWith(
       SpringSimulation(AppMotion.swipeSpring, _dragOffset, 0.0, velocity),
     );
@@ -527,7 +651,6 @@ class _SwipeableArtViewState extends ConsumerState<_SwipeableArtView>
 
   @override
   Widget build(BuildContext context) {
-    // Compute a subtle rotation: art tilts ±5° at ±120 px drag offset
     final rotateAngle = (_dragOffset / 120).clamp(-1.0, 1.0) * 0.09;
 
     return GestureDetector(
@@ -546,8 +669,6 @@ class _SwipeableArtViewState extends ConsumerState<_SwipeableArtView>
               aspectRatio: 1,
               child: Hero(
                 tag: widget.song.id,
-                // AnimatedSwitcher keyed on song.id crossfades album art
-                // when the song changes (either via swipe or skip buttons).
                 child: AnimatedSwitcher(
                   duration: AppMotion.medium,
                   transitionBuilder: (child, anim) =>
@@ -581,7 +702,6 @@ class _SongInfo extends ConsumerWidget {
         AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
@@ -608,6 +728,7 @@ class _SongInfo extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
+          LikeButton(song: song),
           _DownloadButton(song: song, colors: colors),
         ],
       ),
@@ -672,12 +793,10 @@ class _BottomActions extends StatelessWidget {
   const _BottomActions({
     required this.colors,
     required this.shapes,
-    required this.onLyrics,
     required this.onQueue,
   });
   final AroraColors colors;
   final AroraShapes shapes;
-  final VoidCallback onLyrics;
   final VoidCallback onQueue;
 
   @override
@@ -687,15 +806,8 @@ class _BottomActions extends StatelessWidget {
         AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          _ActionPill(
-            icon: Icons.lyrics_outlined,
-            label: 'Lyrics',
-            colors: colors,
-            shapes: shapes,
-            onTap: onLyrics,
-          ),
           _ActionPill(
             icon: Icons.queue_music_rounded,
             label: 'Queue',
@@ -759,8 +871,6 @@ class _ActionPill extends StatelessWidget {
 
 // ── Video view ────────────────────────────────────────────────────────────────
 
-/// Inline video player using chewie. Synchronises video position + play/pause
-/// state to the [AudioPlayerService] since the muxed video stream is audio-less.
 class _VideoView extends ConsumerStatefulWidget {
   const _VideoView({required this.songId});
   final String songId;

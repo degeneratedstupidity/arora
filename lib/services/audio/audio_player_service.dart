@@ -14,25 +14,6 @@ import 'package:arora/services/cache_service.dart';
 import 'package:arora/shared/providers/music_provider_provider.dart';
 import 'package:just_audio/just_audio.dart';
 
-/// {@template audio_player_service}
-/// The central audio playback service for Arora.
-///
-/// ## Responsibilities
-/// - Wraps `just_audio`'s [AudioPlayer] with Arora's domain model.
-/// - Manages the active [Song] and playback state.
-/// - Integrates with [SmartShuffleEngine] for queue management.
-/// - Caches stream URLs for [AppConstants.streamUrlTtl] to avoid
-///   re-fetching the same URL repeatedly (YouTube URLs expire after ~6h).
-/// - Exposes reactive [Stream]s for the UI layer via Riverpod.
-///
-/// ## Usage
-/// This service is registered as a Riverpod provider in `lib/app.dart`.
-/// UI widgets observe its streams via `ref.watch(...)`.
-///
-/// ## Background audio
-/// Background audio and lock screen controls are handled by
-/// [AudioServiceHandler], which wraps this service.
-/// {@endtemplate}
 class AudioPlayerService {
   AudioPlayerService({
     required Ref ref,
@@ -75,11 +56,8 @@ class AudioPlayerService {
     });
   }
 
-  /// Called whenever the song or play/pause state changes.
-  ///
-  /// Wired up by [audioPlayerServiceProvider] to [aroraAudioHandler.onSongChanged]
-  /// so the notification and lock screen stay in sync without a direct import
-  /// of [AudioServiceHandler] (which would create a circular dependency).
+  /// Fires on song change and play/pause toggle — wired to aroraAudioHandler to
+  /// keep lock screen in sync without a circular import of AudioServiceHandler.
   final void Function()? onMediaChanged;
 
   final Ref _ref;
@@ -98,6 +76,23 @@ class AudioPlayerService {
   bool _isFetchingRecs = false;
   bool _isLoading = false;
   final Map<String, Future<String>> _pendingUrlFetches = {};
+
+  // Seed rotation for skipNext() recommendations — each skip uses a different
+  // Radio Mix seed so the resulting pool is genuinely varied.
+  final List<Song> _skipSeeds = [];
+  int _skipSeedIndex = 0;
+
+  // Cross-skip dedup: songs heard earlier this session don't resurface.
+  final Set<String> _heardIds = {};
+  final List<String> _heardIdQueue = [];
+  static const _maxSkipSeeds = 8;
+  static const _maxHeardIds = 100;
+
+  // Completion ratio of the song that just finished — captured before
+  // _player.stop() resets the position. Read by SmartShuffleService for
+  // genre preference feedback.
+  double _lastCompletionRatio = 0.0;
+  String? _lastCompletedSongId;
 
   /// StreamControllers that broadcast state changes to the UI.
   final _currentSongController = StreamController<Song?>.broadcast();
@@ -133,6 +128,8 @@ class AudioPlayerService {
   // ── Synchronous state accessors ───────────────────────────────────────────
 
   Song? get currentSong => _ref.read(playbackQueueProvider).currentSong;
+  double get lastCompletionRatio => _lastCompletionRatio;
+  String? get lastCompletedSongId => _lastCompletedSongId;
   bool get isPlaying => _player.playing;
   bool get isLoading => _isLoading;
   bool get isShuffleEnabled => _ref.read(playbackQueueProvider).isSmartShuffleEnabled;
@@ -155,18 +152,39 @@ class AudioPlayerService {
 
   // ── Playback control ──────────────────────────────────────────────────────
 
-  /// Loads [song] and begins playback immediately.
-  ///
-  /// Resolves the stream URL (with cache), sets the audio source on
-  /// `just_audio`, and plays. Emits loading / error states as needed.
   Future<void> play(Song song, {AudioQuality? quality}) async {
     if (quality != null) _quality = quality;
     _ref.read(playbackQueueProvider.notifier).playSong(song);
   }
 
+  void _recordSongForSkip(Song song) {
+    _addHeardId(song.id);
+    _skipSeeds.removeWhere((s) => s.id == song.id);
+    _skipSeeds.insert(0, song);
+    if (_skipSeeds.length > _maxSkipSeeds) _skipSeeds.removeLast();
+  }
+
+  void _addHeardId(String songId) {
+    if (_heardIds.contains(songId)) return;
+    _heardIds.add(songId);
+    _heardIdQueue.add(songId);
+    if (_heardIdQueue.length > _maxHeardIds) {
+      _heardIds.remove(_heardIdQueue.removeAt(0));
+    }
+  }
+
   Future<void> _loadAndPlaySong(Song song) async {
     _isLoading = true;
     _isLoadingController.add(true);
+
+    // Capture completion ratio before _player.stop() resets position to 0.
+    if (_currentSong != null && _currentSong!.id != song.id) {
+      final pos = _player.position.inMilliseconds;
+      final dur = _player.duration?.inMilliseconds ?? 0;
+      _lastCompletionRatio = dur > 0 ? pos / dur : 0.0;
+      _lastCompletedSongId = _currentSong!.id;
+      _recordSongForSkip(_currentSong!);
+    }
 
     // Emit the song immediately so the player screen renders before URL fetch.
     _currentSong = song;
@@ -199,9 +217,6 @@ class AudioPlayerService {
     }
   }
 
-  /// Initialises a shuffle queue from [songs] and starts playback.
-  ///
-  /// If [startWith] is provided, that song plays first.
   Future<void> playQueue(
     List<Song> songs, {
     Song? startWith,
@@ -233,12 +248,8 @@ class AudioPlayerService {
   Future<void> togglePlayPause() async =>
       _player.playing ? pause() : resume();
 
-  /// Skips to the next song in the queue.
-  ///
-  /// When the queue has more than one song, advances the index normally.
-  /// When only one song is queued, uses pre-fetched recommendations (or fetches
-  /// them on demand) to grow the queue before advancing — otherwise Riverpod
-  /// sees identical state and the listener never fires.
+  // Single-song queue: grows the queue before advancing because next() on
+  // index 0 of length 1 produces identical Riverpod state — listener never fires.
   Future<void> skipNext() async {
     _log.debug('skipNext');
     final queue = _ref.read(playbackQueueProvider);
@@ -257,10 +268,17 @@ class AudioPlayerService {
     try {
       _log.debug('skipNext: fetching recs on demand');
       final musicProvider = _ref.read(musicProviderProvider);
+
+      // Rotate through recently played songs as seeds so each skip produces
+      // a different Radio Mix rather than always re-using the current song.
+      final seedPool = _skipSeeds.isNotEmpty ? _skipSeeds : [currentSong];
+      final seed = seedPool[_skipSeedIndex % seedPool.length];
+      _skipSeedIndex++;
+
       final List<Song> recs = await musicProvider.getRecommendations(
-        currentSong.id,
+        seed.id,
         limit: 10,
-        artistHint: currentSong.artistName,
+        artistHint: seed.artistName,
       );
 
       // Race-condition guard: abort if the user started a different song while
@@ -268,9 +286,13 @@ class AudioPlayerService {
       final latestQueue = _ref.read(playbackQueueProvider);
       if (latestQueue.currentSong?.id != currentSong.id) return;
 
-      if (recs.isNotEmpty) {
-        _ref.read(playbackQueueProvider.notifier).addAllLast(recs);
-        // The queue listener pre-fetches the next song's URL automatically here.
+      // Filter out songs heard earlier this session.
+      final filtered =
+          recs.where((s) => !_heardIds.contains(s.id)).toList();
+      final toAdd = filtered.isNotEmpty ? filtered : recs;
+
+      if (toAdd.isNotEmpty) {
+        _ref.read(playbackQueueProvider.notifier).addAllLast(toAdd);
       }
     } catch (_) {
       // Best-effort — silently skip if offline or API is unavailable.
@@ -341,11 +363,8 @@ class AudioPlayerService {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /// Returns a cached stream URL for [song], or fetches a fresh one.
-  ///
-  /// Concurrent callers for the same [song.id] share the in-flight request
-  /// so we never hit the YouTube API twice for the same track simultaneously
-  /// (e.g. pre-fetch and actual playback racing each other).
+  // Concurrent callers for the same song.id share one in-flight fetch —
+  // prevents duplicate YouTube API calls when pre-fetch and playback race.
   Future<String> _resolveUrl(Song song) async {
     if (song.isDownloaded && song.localFilePath != null) {
       return song.localFilePath!;

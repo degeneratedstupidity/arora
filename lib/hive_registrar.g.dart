@@ -3,8 +3,6 @@
 // Check in to version control
 
 import 'package:hive_ce/hive_ce.dart';
-import 'package:arora/data/models/playlist_model.dart';
-import 'package:arora/data/models/song_model.dart';
 import 'package:arora/domain/entities/playlist.dart';
 import 'package:arora/domain/entities/settings.dart';
 import 'package:arora/domain/entities/song.dart';
@@ -13,10 +11,8 @@ extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
     registerAdapter(AppThemeModeAdapter());
     registerAdapter(PlaylistAdapter());
-    registerAdapter(PlaylistModelAdapter());
     registerAdapter(SettingsAdapter());
     registerAdapter(SongAdapter());
-    registerAdapter(SongModelAdapter());
   }
 }
 
@@ -24,9 +20,7 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(AppThemeModeAdapter());
     registerAdapter(PlaylistAdapter());
-    registerAdapter(PlaylistModelAdapter());
     registerAdapter(SettingsAdapter());
     registerAdapter(SongAdapter());
-    registerAdapter(SongModelAdapter());
   }
 }

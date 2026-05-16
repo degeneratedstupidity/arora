@@ -3,21 +3,15 @@ import 'package:arora/core/utils/logger.dart';
 import 'package:arora/data/datasources/local/hive_database.dart';
 import 'package:arora/domain/entities/playlist.dart';
 import 'package:arora/domain/entities/song.dart';
-import 'package:arora/domain/repositories/music_repository.dart';
 import 'package:hive_ce/hive.dart';
 
-/// Hive CE-backed implementation of [PlaylistRepository].
-///
-/// Uses [HiveDatabase.playlistsBoxName] (Box<Playlist>) opened during app init.
-/// Songs are embedded directly in the Playlist entity — no secondary lookup needed.
-class PlaylistRepositoryImpl implements PlaylistRepository {
+class PlaylistRepositoryImpl {
   static const _log = AroraLogger('PlaylistRepositoryImpl');
 
   Box<Playlist> get _box => Hive.box<Playlist>(HiveDatabase.playlistsBoxName);
 
   // ── Read ──────────────────────────────────────────────────────────────────
 
-  @override
   Future<List<Playlist>> getAllPlaylists() async {
     try {
       return _box.values.toList();
@@ -27,7 +21,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
     }
   }
 
-  @override
   Future<Playlist?> getPlaylistById(String id) async {
     try {
       return _box.get(id);
@@ -39,7 +32,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
 
   // ── Create ────────────────────────────────────────────────────────────────
 
-  @override
   Future<Playlist> createPlaylist(String name, {String? description}) async {
     try {
       final id = DateTime.now().millisecondsSinceEpoch.toString();
@@ -55,7 +47,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
 
   // ── Update ────────────────────────────────────────────────────────────────
 
-  @override
   Future<Playlist> updatePlaylistDetails(
     String id, {
     String? name,
@@ -73,7 +64,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
     }
   }
 
-  @override
   Future<void> addSongToPlaylist(String playlistId, Song song) async {
     try {
       final playlist = _box.get(playlistId) ??
@@ -90,7 +80,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
     }
   }
 
-  @override
   Future<void> removeSongFromPlaylist(String playlistId, String songId) async {
     try {
       final playlist = _box.get(playlistId) ??
@@ -107,7 +96,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
     }
   }
 
-  @override
   Future<void> reorderPlaylist(String playlistId, List<String> songIds) async {
     try {
       final playlist = _box.get(playlistId) ??
@@ -124,7 +112,6 @@ class PlaylistRepositoryImpl implements PlaylistRepository {
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  @override
   Future<void> deletePlaylist(String id) async {
     try {
       await _box.delete(id);

@@ -35,6 +35,16 @@ class PlaybackQueueNotifier extends _$PlaybackQueueNotifier {
     }
   }
 
+  /// Replaces every song after the current index with [songs].
+  /// Used by SmartShuffleService on force-refresh so the upcoming queue
+  /// is exactly the new batch (no stale leftover songs ahead).
+  void replaceUpcoming(List<Song> songs) {
+    final kept = state.songs.take(state.currentIndex + 1).toList();
+    final existingIds = kept.map((s) => s.id).toSet();
+    final unique = songs.where((s) => !existingIds.contains(s.id)).toList();
+    state = state.copyWith(songs: [...kept, ...unique]);
+  }
+
   void toggleSmartShuffle() {
     state = state.copyWith(isSmartShuffleEnabled: !state.isSmartShuffleEnabled);
   }

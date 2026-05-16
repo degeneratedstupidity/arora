@@ -2,17 +2,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:arora/data/repositories/playlist_repository_impl.dart';
 import 'package:arora/domain/entities/playlist.dart';
 import 'package:arora/domain/entities/song.dart';
-import 'package:arora/domain/repositories/music_repository.dart';
+import 'package:arora/services/liked_songs_service.dart';
 
-/// The playlist repository — backed by Isar.
-final playlistRepositoryProvider = Provider<PlaylistRepository>((ref) {
+final playlistRepositoryProvider = Provider<PlaylistRepositoryImpl>((ref) {
   return PlaylistRepositoryImpl();
 });
 
-/// All user playlists, sorted by last modified.
+/// All user-created playlists. Excludes the system Liked Songs playlist.
 final playlistsProvider = FutureProvider<List<Playlist>>((ref) async {
   final repo = ref.watch(playlistRepositoryProvider);
-  return repo.getAllPlaylists();
+  final all = await repo.getAllPlaylists();
+  return all.where((p) => p.id != likedSongsPlaylistId).toList();
 });
 
 /// A single playlist with its full song list.

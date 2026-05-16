@@ -343,8 +343,8 @@ class _GhostIconButton extends StatelessWidget {
       pressedScale: 0.82,
       onTap: onTap,
       child: SizedBox(
-        width: AppSpacing.touchTargetSm,
-        height: AppSpacing.touchTargetSm,
+        width: 36,
+        height: 36,
         child: Icon(icon, color: color, size: size),
       ),
     );

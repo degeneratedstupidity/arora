@@ -15,7 +15,6 @@ import 'package:arora/features/player/screens/now_playing_screen.dart';
 import 'package:arora/features/player/widgets/mini_player_bar.dart';
 import 'package:arora/features/search/screens/search_screen.dart';
 import 'package:arora/infrastructure/youtube/youtube_explode_music_provider.dart';
-import 'package:arora/shared/widgets/spring_button.dart';
 import 'package:arora/shared/widgets/window_title_bar.dart';
 
 import 'package:arora/core/theme/settings_screen.dart';
@@ -53,7 +52,6 @@ buildProviderOverrides({http.Client? httpClient}) {
 
 // Width breakpoints — kept in sync with main_shell.dart
 const _kDesktopBreak = 800.0;
-const _kWideDesktopBreak = 1200.0;
 
 /// The global GoRouter instance with all named routes.
 final _router = GoRouter(
@@ -251,9 +249,16 @@ const _tabs = <_NavTab>[
 ];
 
 /// Persistent scaffold that swaps between mobile + desktop layouts.
-class _AdaptiveShell extends ConsumerWidget {
+class _AdaptiveShell extends ConsumerStatefulWidget {
   const _AdaptiveShell({required this.child});
   final Widget child;
+
+  @override
+  ConsumerState<_AdaptiveShell> createState() => _AdaptiveShellState();
+}
+
+class _AdaptiveShellState extends ConsumerState<_AdaptiveShell> {
+  bool _sidebarCollapsed = false;
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
@@ -266,29 +271,30 @@ class _AdaptiveShell extends ConsumerWidget {
   void _onTap(BuildContext context, int index) => context.go(_tabs[index].path);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= _kDesktopBreak;
-        final isWide = constraints.maxWidth >= _kWideDesktopBreak;
         final currentIndex = _currentIndex(context);
 
         return Column(
           children: [
-            // Frameless custom title bar (desktop only, hidden on mobile/web)
             const WindowTitleBar(),
             Expanded(
               child: isDesktop
                   ? _DesktopLayout(
                       currentIndex: currentIndex,
-                      extended: isWide,
+                      collapsed: _sidebarCollapsed,
                       onTap: (i) => _onTap(context, i),
-                      child: child,
+                      onToggleCollapse: () => setState(
+                        () => _sidebarCollapsed = !_sidebarCollapsed,
+                      ),
+                      child: widget.child,
                     )
                   : _MobileLayout(
                       currentIndex: currentIndex,
                       onTap: (i) => _onTap(context, i),
-                      child: child,
+                      child: widget.child,
                     ),
             ),
           ],
@@ -299,78 +305,145 @@ class _AdaptiveShell extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Desktop layout — NavigationRail + optional expanded sidebar
+// Desktop layout — Echo-style collapsible sidebar
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
     required this.child,
     required this.currentIndex,
-    required this.extended,
+    required this.collapsed,
     required this.onTap,
+    required this.onToggleCollapse,
   });
 
   final Widget child;
   final int currentIndex;
-  final bool extended;
+  final bool collapsed;
   final ValueChanged<int> onTap;
+  final VoidCallback onToggleCollapse;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).extension<AroraTheme>()!;
     final c = t.colors(context);
+    const expandedWidth = 260.0;
+    const collapsedWidth = 80.0;
 
     return Row(
       children: [
-        // ── Sidebar / Rail ───────────────────────────────────────────────
-        // No border — depth comes from background color contrast alone:
-        // scaffold uses c.background, sidebar uses c.surface.
-        Container(
-          color: c.surface,
+        // ── Echo sidebar ─────────────────────────────────────────────────
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          width: collapsed ? collapsedWidth : expandedWidth,
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border(
+              right: BorderSide(
+                color: c.surfaceHighest.withAlpha(60),
+                width: 1,
+              ),
+            ),
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: NavigationRail(
-                  extended: extended,
-                  selectedIndex: currentIndex,
-                  onDestinationSelected: onTap,
-                  backgroundColor: Colors.transparent,
-                  // Styling flows from navigationRailTheme set in AroraTheme.toMaterialTheme
-                  destinations: _tabs
-                      .map(
-                        (t) => NavigationRailDestination(
-                          icon: Icon(t.icon),
-                          selectedIcon: Icon(t.activeIcon),
-                          label: Text(t.label),
+              // ── Logo + toggle ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 12, 24),
+                child: Row(
+                  children: [
+                    // App logo mark
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: c.textPrimary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: c.background,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ),
+                    if (!collapsed) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Arora',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: c.textPrimary,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                    // Collapse toggle
+                    IconButton(
+                      onPressed: onToggleCollapse,
+                      icon: Icon(
+                        collapsed ? Icons.menu_rounded : Icons.menu_open_rounded,
+                        color: c.textSecondary,
+                        size: 20,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // Mini player at the bottom of the sidebar (extended rail only)
-              if (extended)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm,),
-                  child: MiniPlayerBar(),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: SpringButton(
-                    onTap: () => context.push('/player'),
-                    child: SizedBox(
-                      width: AppSpacing.touchTarget,
-                      height: AppSpacing.touchTarget,
-                      child: Icon(
-                        Icons.queue_music_rounded,
-                        color: c.textSecondary,
-                        size: 22,
-                      ),
-                    ),
+              // ── Nav items ─────────────────────────────────────────────
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    children: _tabs.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final tab = entry.value;
+                      final isActive = currentIndex == i;
+                      return _SidebarNavItem(
+                        icon: isActive ? tab.activeIcon : tab.icon,
+                        label: tab.label,
+                        isActive: isActive,
+                        collapsed: collapsed,
+                        colors: c,
+                        onTap: () => onTap(i),
+                      );
+                    }).toList(),
                   ),
                 ),
+              ),
+
+              // ── Bottom: Import + mini player ───────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+                child: Column(
+                  children: [
+                    // Import button
+                    _SidebarImportButton(
+                      collapsed: collapsed,
+                      colors: c,
+                      onTap: () => context.push('/import_playlist'),
+                    ),
+                    const SizedBox(height: 8),
+                    // Mini player
+                    if (!collapsed) const MiniPlayerBar(),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -378,6 +451,123 @@ class _DesktopLayout extends StatelessWidget {
         // ── Main content ─────────────────────────────────────────────────
         Expanded(child: child),
       ],
+    );
+  }
+}
+
+class _SidebarNavItem extends StatelessWidget {
+  const _SidebarNavItem({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.collapsed,
+    required this.colors,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool isActive;
+  final bool collapsed;
+  final AroraColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: EdgeInsets.symmetric(
+            horizontal: collapsed ? 0 : 14,
+            vertical: 11,
+          ),
+          decoration: BoxDecoration(
+            color: isActive
+                ? colors.surfaceHighest.withAlpha(180)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+          child: Row(
+            mainAxisAlignment:
+                collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: isActive ? colors.textPrimary : colors.textSecondary,
+              ),
+              if (!collapsed) ...[
+                const SizedBox(width: 14),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        isActive ? FontWeight.w600 : FontWeight.w400,
+                    color: isActive
+                        ? colors.textPrimary
+                        : colors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarImportButton extends StatelessWidget {
+  const _SidebarImportButton({
+    required this.collapsed,
+    required this.colors,
+    required this.onTap,
+  });
+  final bool collapsed;
+  final AroraColors colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: colors.textPrimary.withAlpha(220),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+          child: Row(
+            mainAxisAlignment:
+                collapsed ? MainAxisAlignment.center : MainAxisAlignment.center,
+            children: [
+              Icon(Icons.subscriptions_outlined, size: 16, color: colors.background),
+              if (!collapsed) ...[
+                const SizedBox(width: 8),
+                Text(
+                  'Import Library',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colors.background,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
