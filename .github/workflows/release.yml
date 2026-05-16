@@ -31,6 +31,11 @@ jobs:
         with:
           channel: stable
 
+      # .env is a Flutter asset but holds only optional Phase 2+ keys.
+      # An empty file is valid for all current app functionality.
+      - name: Create empty .env
+        run: touch .env
+
       # Inject secrets — both files are gitignored
       - name: Write google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
@@ -82,10 +87,13 @@ jobs:
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
             libgtk-3-dev libblkid-dev liblzma-dev \
-            libmpv-dev libfuse2 libappindicator3-dev
+            libmpv-dev libappindicator3-dev
 
       - name: Enable Linux desktop target
         run: flutter config --enable-linux-desktop
+
+      - name: Create empty .env
+        run: touch .env
 
       - name: Install dependencies
         run: flutter pub get
@@ -128,7 +136,10 @@ jobs:
           APPRUN
           chmod +x "$APPDIR/AppRun"
 
-          ARCH=x86_64 /tmp/appimagetool "$APPDIR" arora-linux-x86_64.AppImage
+          # APPIMAGE_EXTRACT_AND_RUN=1: run appimagetool without FUSE,
+          # required on ubuntu-latest (24.04) where libfuse2 is not available.
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 /tmp/appimagetool \
+            "$APPDIR" arora-linux-x86_64.AppImage
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
@@ -152,6 +163,10 @@ jobs:
 
       - name: Enable Windows desktop target
         run: flutter config --enable-windows-desktop
+
+      - name: Create empty .env
+        run: New-Item -ItemType File -Path .env -Force
+        shell: powershell
 
       - name: Install dependencies
         run: flutter pub get
