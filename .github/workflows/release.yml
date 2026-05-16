@@ -1,10 +1,11 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.0.0 && git push origin v1.0.0
+# Triggered by pushing a version tag or manually via the Actions menu
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 # Needed to create the GitHub Release and upload assets
 permissions:
