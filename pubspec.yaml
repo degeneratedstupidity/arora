@@ -2,7 +2,7 @@ name: arora
 description: >
   Arora — A free, open-source, cross-platform music player powered by YouTube Music.
   Built with Flutter for Android, iOS, Linux, macOS, Windows, and Web.
-version: 1.1.0+2
+version: 1.2.0+3
 publish_to: "none"
 
 environment:
